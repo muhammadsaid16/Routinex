@@ -172,10 +172,57 @@ function contentSignature(record: any): string {
 }
 
 function keyFor(table: SyncTable, record: any): string {
-  if (table === 'habits') return String(record.id);
   if (table === 'entries') return `${record.habitId}|${record.date}`;
-  return String(record.key);
+  if (table === 'settings') return String(record.key);
+  return String(record.id);
 }
+
+/**
+ * The store behind every synced table. One place to teach the sync layer a
+ * new table instead of a chain of ifs.
+ */
+const TABLE_STORES: Record<SyncTable, {
+  put: (records: any[]) => Promise<any>;
+  remove: (key: string) => Promise<any>;
+  get: (key: string) => Promise<any>;
+}> = {
+  habits: {
+    put: (records) => db.habits.bulkPut(records),
+    remove: (key) => db.habits.delete(key),
+    get: (key) => db.habits.get(key),
+  },
+  entries: {
+    put: (records) => db.entries.bulkPut(records),
+    remove: (key) => {
+      const [habitId, date] = key.split('|');
+      return habitId && date ? db.entries.delete([habitId, date]) : Promise.resolve();
+    },
+    get: (key) => {
+      const [habitId, date] = key.split('|');
+      return habitId && date ? db.entries.get([habitId, date]) : Promise.resolve(undefined);
+    },
+  },
+  settings: {
+    put: (records) => db.settings.bulkPut(records),
+    remove: (key) => db.settings.delete(key),
+    get: (key) => db.settings.get(key),
+  },
+  accounts: {
+    put: (records) => db.accounts.bulkPut(records),
+    remove: (key) => db.accounts.delete(key),
+    get: (key) => db.accounts.get(key),
+  },
+  transactions: {
+    put: (records) => db.transactions.bulkPut(records),
+    remove: (key) => db.transactions.delete(key),
+    get: (key) => db.transactions.get(key),
+  },
+  budgets: {
+    put: (records) => db.budgets.bulkPut(records),
+    remove: (key) => db.budgets.delete(key),
+    get: (key) => db.budgets.get(key),
+  },
+};
 
 /** Last write wins, with the device id as tie breaker. */
 function isRemoteNewer(remote: any, local: any): boolean {
@@ -240,14 +287,13 @@ class SyncManager {
   private lastPongAt = 0;
   private suppressBroadcast = 0;
 
-  private baseline: {
-    habits: Map<string, SyncedHabit>;
-    entries: Map<string, SyncedEntry>;
-    settings: Map<string, SyncedSetting>;
-  } = {
+  private baseline: Record<SyncTable, Map<string, any>> = {
     habits: new Map(),
     entries: new Map(),
     settings: new Map(),
+    accounts: new Map(),
+    transactions: new Map(),
+    budgets: new Map(),
   };
 
   private tombstones = new Map<string, Tombstone>();
@@ -256,10 +302,13 @@ class SyncManager {
    * A record that is missing from the app array but was never shown to the app
    * is not a removal. It is a record that just arrived from the paired device.
    */
-  private appSeen: { habits: Set<string>; entries: Set<string>; settings: Set<string> } = {
+  private appSeen: Record<SyncTable, Set<string>> = {
     habits: new Set(),
     entries: new Set(),
     settings: new Set(),
+    accounts: new Set(),
+    transactions: new Set(),
+    budgets: new Set(),
   };
   private stateListeners = new Set<StateListener>();
   private dataListeners = new Set<DataListener>();
@@ -275,18 +324,25 @@ class SyncManager {
 
   private async loadBaseline(): Promise<void> {
     try {
-      const [habits, entries, settings, tombstones] = await Promise.all([
-        db.habits.toArray(),
-        db.entries.toArray(),
-        db.settings.toArray(),
-        db.tombstones.toArray(),
-      ]);
+      const [habits, entries, settings, tombstones, accounts, transactions, budgets] =
+        await Promise.all([
+          db.habits.toArray(),
+          db.entries.toArray(),
+          db.settings.toArray(),
+          db.tombstones.toArray(),
+          db.accounts.toArray(),
+          db.transactions.toArray(),
+          db.budgets.toArray(),
+        ]);
 
       this.baseline.habits = new Map(habits.map((h) => [h.id, h as SyncedHabit]));
       this.baseline.entries = new Map(
         entries.map((e) => [`${e.habitId}|${e.date}`, e as SyncedEntry])
       );
       this.baseline.settings = new Map(settings.map((s) => [s.key, s as SyncedSetting]));
+      this.baseline.accounts = new Map(accounts.map((a) => [a.id, a]));
+      this.baseline.transactions = new Map(transactions.map((t) => [t.id, t]));
+      this.baseline.budgets = new Map(budgets.map((b) => [b.id, b]));
       this.tombstones = new Map(tombstones.map((t) => [t.id, t]));
     } catch (err) {
       console.error('Sync baseline load failed:', err);
@@ -630,9 +686,7 @@ class SyncManager {
 
     try {
       if (changed.length > 0) {
-        if (table === 'habits') await db.habits.bulkPut(changed);
-        else if (table === 'entries') await db.entries.bulkPut(changed);
-        else await db.settings.bulkPut(changed);
+        await TABLE_STORES[table].put(changed);
       }
 
       for (const key of removed) {
@@ -658,14 +712,7 @@ class SyncManager {
   /** Removes a record from the local database. */
   private async deleteLocalRecord(table: SyncTable, key: string): Promise<void> {
     try {
-      if (table === 'habits') {
-        await db.habits.delete(key);
-      } else if (table === 'entries') {
-        const [habitId, date] = key.split('|');
-        if (habitId && date) await db.entries.delete([habitId, date]);
-      } else {
-        await db.settings.delete(key);
-      }
+      await TABLE_STORES[table].remove(key);
     } catch (err) {
       console.error('Sync local delete failed:', err);
     }
@@ -1080,8 +1127,20 @@ class SyncManager {
       (SYNCED_SETTINGS as readonly string[]).includes(s.key)
     );
     const tombstones = Array.from(this.tombstones.values());
+    const accounts = Array.from(this.baseline.accounts.values());
+    const transactions = Array.from(this.baseline.transactions.values());
+    const budgets = Array.from(this.baseline.budgets.values());
 
-    this.send({ t: 'snapshot', habits, entries, settings, tombstones });
+    this.send({
+      t: 'snapshot',
+      habits,
+      entries,
+      settings,
+      tombstones,
+      accounts,
+      transactions,
+      budgets,
+    });
     this.emitState({ lastSyncAt: Date.now() });
   }
 
@@ -1097,6 +1156,15 @@ class SyncManager {
       }
       for (const setting of message.settings || []) {
         await this.applyUpsert('settings', setting);
+      }
+      for (const account of message.accounts || []) {
+        await this.applyUpsert('accounts', account);
+      }
+      for (const transaction of message.transactions || []) {
+        await this.applyUpsert('transactions', transaction);
+      }
+      for (const budget of message.budgets || []) {
+        await this.applyUpsert('budgets', budget);
       }
       for (const tombstone of message.tombstones || []) {
         await this.applyRemove(
@@ -1128,16 +1196,8 @@ class SyncManager {
 
     this.suppressBroadcast++;
     try {
-      if (table === 'habits') {
-        await db.habits.put(record);
-        this.baseline.habits.set(key, record as SyncedHabit);
-      } else if (table === 'entries') {
-        await db.entries.put(record);
-        this.baseline.entries.set(key, record as SyncedEntry);
-      } else {
-        await db.settings.put(record);
-        this.baseline.settings.set(key, record as SyncedSetting);
-      }
+      await TABLE_STORES[table].put([record]);
+      this.baseline[table].set(key, record);
     } catch (err) {
       console.error('Sync remote write failed:', err);
     } finally {
@@ -1164,17 +1224,8 @@ class SyncManager {
 
     this.suppressBroadcast++;
     try {
-      if (table === 'habits') {
-        await db.habits.delete(key);
-        this.baseline.habits.delete(key);
-      } else if (table === 'entries') {
-        const [habitId, date] = key.split('|');
-        if (habitId && date) await db.entries.delete([habitId, date]);
-        this.baseline.entries.delete(key);
-      } else {
-        await db.settings.delete(key);
-        this.baseline.settings.delete(key);
-      }
+      await TABLE_STORES[table].remove(key);
+      this.baseline[table].delete(key);
 
       const tombstone: Tombstone = {
         id: `${table}:${key}`,

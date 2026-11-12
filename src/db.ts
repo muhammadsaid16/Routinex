@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import { Habit, HabitEntry } from './types';
 import { Tombstone } from './sync/types';
+import { MoneyAccount, MoneyBudget, MoneyTransaction } from './money/types';
 
 export interface AppSetting {
   key: string;
@@ -19,6 +20,9 @@ export class RoutinixDatabase extends Dexie {
   entries!: Table<HabitEntry, [string, string]>;
   settings!: Table<AppSetting, string>;
   tombstones!: Table<Tombstone, string>;
+  accounts!: Table<MoneyAccount, string>;
+  transactions!: Table<MoneyTransaction, string>;
+  budgets!: Table<MoneyBudget, string>;
 
   constructor() {
     super('RoutinixDB');
@@ -32,6 +36,15 @@ export class RoutinixDatabase extends Dexie {
       entries: '[habitId+date], habitId, date, completed',
       settings: 'key',
       tombstones: 'id, table, updatedAt',
+    });
+    this.version(3).stores({
+      habits: 'id, createdAt, archived',
+      entries: '[habitId+date], habitId, date, completed',
+      settings: 'key',
+      tombstones: 'id, table, updatedAt',
+      accounts: 'id, type, archived',
+      transactions: 'id, date, accountId, category, habitId',
+      budgets: 'id, month, category',
     });
   }
 }

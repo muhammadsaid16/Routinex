@@ -1,6 +1,12 @@
 import { Habit, HabitEntry } from '../types';
 
-export type SyncTable = 'habits' | 'entries' | 'settings';
+export type SyncTable =
+  | 'habits'
+  | 'entries'
+  | 'settings'
+  | 'accounts'
+  | 'transactions'
+  | 'budgets';
 
 export interface SyncStamp {
   /** Epoch milliseconds of the last write. Drives the last-write-wins merge. */
@@ -30,6 +36,9 @@ export type SyncMessage =
       entries: SyncedEntry[];
       settings: SyncedSetting[];
       tombstones: Tombstone[];
+      accounts?: any[];
+      transactions?: any[];
+      budgets?: any[];
     }
   | { t: 'upsert'; table: SyncTable; record: any }
   | { t: 'remove'; table: SyncTable; key: string; updatedAt: number; updatedBy: string }
@@ -53,5 +62,11 @@ export interface SyncState {
   linked: boolean;
 }
 
-export const SYNCED_SETTINGS = ['userName', 'activeThemeId', 'uiScale'] as const;
+export const SYNCED_SETTINGS = [
+  'userName',
+  'activeThemeId',
+  'uiScale',
+  'milestonesEnabled',
+  'currency',
+] as const;
 export type SyncedSettingKey = (typeof SYNCED_SETTINGS)[number];

@@ -1,13 +1,16 @@
 import React from 'react';
-import { LayoutDashboard, CheckSquare, BarChart3, Trophy, Bot, Settings, Palette } from 'lucide-react';
+import { Settings, Palette } from 'lucide-react';
 import { getInitials } from '../storage';
+import { sound } from '../audio';
 import { THEMES } from '../themes';
+import { AppModule, MODULES, NavTab, navFor } from '../navigation';
 
-export type NavTab = 'dashboard' | 'habits' | 'progress' | 'milestones' | 'coach' | 'account';
+export type { NavTab };
 
 interface SidebarProps {
   currentTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  onModuleChange: (module: AppModule) => void;
   consistencyPercentage: number;
   onOpenTheme: () => void;
   userName?: string;
@@ -17,19 +20,18 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onTabChange,
+  onModuleChange,
   consistencyPercentage,
   onOpenTheme,
   userName = 'Operator',
   showMilestones = true,
 }) => {
   const initials = getInitials(userName);
-  const navItems = [
-    { id: 'dashboard' as NavTab, label: 'Overview', icon: LayoutDashboard },
-    { id: 'habits' as NavTab, label: 'Habits', icon: CheckSquare },
-    { id: 'progress' as NavTab, label: 'Progress', icon: BarChart3 },
-    ...(showMilestones ? [{ id: 'milestones' as NavTab, label: 'Milestones', icon: Trophy }] : []),
-    { id: 'coach' as NavTab, label: 'Coach', icon: Bot },
-  ];
+  const activeModule: AppModule =
+    currentTab === 'money' || currentTab === 'transactions' || currentTab === 'budgets'
+      ? 'money'
+      : 'habits';
+  const navItems = navFor(activeModule, showMilestones);
 
   return (
     <>
@@ -46,8 +48,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
+          {/* Module Switcher */}
+          <div className="mt-6">
+            <div className="text-[10px] uppercase tracking-wider text-ob-dim font-medium px-1 mb-2">
+              Module
+            </div>
+            <div className="flex gap-1 p-1 rounded-xl bg-ob-s1 border border-ob-line">
+              {MODULES.map((module) => {
+                const Icon = module.icon;
+                const isActive = module.id === activeModule;
+                return (
+                  <button
+                    key={module.id}
+                    onClick={() => {
+                      sound.playClick();
+                      onModuleChange(module.id);
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                      isActive
+                        ? 'bg-ob-raised text-ob-gold shadow-sm'
+                        : 'text-ob-dim hover:text-ob-text'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {module.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Nav Items */}
-          <nav className="mt-8 flex flex-col gap-1">
+          <nav className="mt-5 flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -119,6 +151,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="font-bold tracking-widest text-sm text-ob-text">ROUTINIX</span>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex gap-0.5 p-0.5 rounded-lg border border-ob-line bg-ob-s1">
+            {MODULES.map((module) => {
+              const Icon = module.icon;
+              const isActive = module.id === activeModule;
+              return (
+                <button
+                  key={module.id}
+                  onClick={() => {
+                    sound.playClick();
+                    onModuleChange(module.id);
+                  }}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    isActive ? 'bg-ob-raised text-ob-gold' : 'text-ob-dim'
+                  }`}
+                  title={module.label}
+                  aria-label={module.label}
+                >
+                  <Icon className="w-4 h-4" />
+                </button>
+              );
+            })}
+          </div>
           <button
             onClick={onOpenTheme}
             className="p-1.5 rounded-lg border border-ob-line bg-ob-s1 text-ob-gold hover:bg-ob-raised transition-colors"
@@ -138,7 +192,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Mobile Bottom Navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ob-line bg-ob-sidebar pb-[env(safe-area-inset-bottom)] lg:hidden">
-        <div className="grid grid-cols-5 h-[56px] w-full mx-auto px-0.5">
+        <div
+          className="grid h-[56px] w-full mx-auto px-0.5"
+          style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
@@ -154,7 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="absolute top-0 h-[2px] w-6 rounded-b-full bg-ob-gold" />
                 )}
                 <Icon className="w-4 h-4" />
-                <span className="truncate max-w-[56px]">{item.label}</span>
+                <span className="truncate max-w-full px-0.5">{item.label}</span>
               </button>
             );
           })}

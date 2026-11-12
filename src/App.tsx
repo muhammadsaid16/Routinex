@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Sidebar, NavTab } from './components/Sidebar';
+import { Sidebar } from './components/Sidebar';
+import { AppModule, NavTab } from './navigation';
 import { DashboardView } from './views/DashboardView';
 import { HabitsView } from './views/HabitsView';
 import { ProgressView } from './views/ProgressView';
 import { MilestonesView } from './views/MilestonesView';
 import { CoachView } from './views/CoachView';
 import { AccountView } from './views/AccountView';
+import { MoneyView } from './views/MoneyView';
+import { TransactionsView } from './views/TransactionsView';
+import { BudgetsView } from './views/BudgetsView';
 import { ThemeModal } from './components/ThemeModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Habit, HabitEntry, DayOfWeek } from './types';
@@ -28,6 +32,13 @@ import { UIScaleOption, applyUIScale, getSavedUIScale, UI_SCALES } from './uiSca
 import { syncManager } from './sync/syncManager';
 import { loadFromDexie } from './storage';
 import { getMilestonesEnabled, setMilestonesEnabled } from './milestones';
+import {
+  loadMoney,
+  saveAccounts,
+  saveBudgets,
+  saveTransactions,
+} from './money/storage';
+import { MoneyAccount, MoneyBudget, MoneyTransaction } from './money/types';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -36,6 +47,11 @@ export const App: React.FC = () => {
   const [currentThemeId, setCurrentThemeId] = useState<string>(getSavedThemeId);
   const [currentScale, setCurrentScale] = useState<UIScaleOption>(getSavedUIScale);
   const [milestonesEnabled, setMilestonesState] = useState<boolean>(getMilestonesEnabled);
+  const [money, setMoney] = useState<{
+    accounts: MoneyAccount[];
+    transactions: MoneyTransaction[];
+    budgets: MoneyBudget[];
+  }>({ accounts: [], transactions: [], budgets: [] });
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [selectedHabitIndex, setSelectedHabitIndex] = useState(0);
@@ -54,11 +70,17 @@ export const App: React.FC = () => {
       }
       syncManager.confirmAppState(dexieData.habits, dexieData.entries);
     });
+
+    loadMoney().then((moneyData) => setMoney(moneyData));
   }, []);
 
   // Device sync: pull records that arrived from the paired device
   useEffect(() => {
-    return syncManager.onRemoteData(() => {
+    return syncManager.onRemoteData((table) => {
+      if (table === 'accounts' || table === 'transactions' || table === 'budgets') {
+        loadMoney().then(setMoney);
+        return;
+      }
       loadFromDexie().then((fresh) => {
         setData(fresh);
         syncManager.confirmAppState(fresh.habits, fresh.entries);
@@ -341,6 +363,7 @@ export const App: React.FC = () => {
         onOpenTheme={() => setIsThemeModalOpen(true)}
         userName={userName}
         showMilestones={milestonesEnabled}
+        onModuleChange={(module: AppModule) => setCurrentTab(module === 'money' ? 'money' : 'dashboard')}
       />
 
       {/* Main Content Area */}
@@ -373,6 +396,53 @@ export const App: React.FC = () => {
             stats={stats}
             onToggleEntry={handleToggleEntry}
             onNavigateToMilestones={milestonesEnabled ? () => setCurrentTab('milestones') : undefined}
+          />
+        )}
+
+        {currentTab === 'money' && (
+          <MoneyView
+            accounts={money.accounts}
+            transactions={money.transactions}
+            budgets={money.budgets}
+            habits={habits}
+            entries={entries}
+            onOpenTransactions={() => setCurrentTab('transactions')}
+            onOpenBudgets={() => setCurrentTab('budgets')}
+            onAddAccount={(account) => {
+              const next = [...money.accounts, account];
+              setMoney((prev) => ({ ...prev, accounts: next }));
+              saveAccounts(next);
+            }}
+          />
+        )}
+
+        {currentTab === 'transactions' && (
+          <TransactionsView
+            accounts={money.accounts}
+            transactions={money.transactions}
+            habits={habits.filter((h) => !h.archived)}
+            onSaveTransaction={(transaction) => {
+              const next = [...money.transactions.filter((t) => t.id !== transaction.id), transaction];
+              setMoney((prev) => ({ ...prev, transactions: next }));
+              saveTransactions(next);
+            }}
+            onDeleteTransaction={(id) => {
+              const next = money.transactions.filter((t) => t.id !== id);
+              setMoney((prev) => ({ ...prev, transactions: next }));
+              saveTransactions(next);
+            }}
+            onAddAccount={() => setCurrentTab('money')}
+          />
+        )}
+
+        {currentTab === 'budgets' && (
+          <BudgetsView
+            budgets={money.budgets}
+            transactions={money.transactions}
+            onSaveBudgets={(budgets) => {
+              setMoney((prev) => ({ ...prev, budgets }));
+              saveBudgets(budgets);
+            }}
           />
         )}
 

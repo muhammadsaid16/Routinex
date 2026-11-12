@@ -257,21 +257,30 @@ export async function loadFromDexie(): Promise<{ habits: Habit[]; entries: Habit
 export async function exportBackupJSON(): Promise<string> {
   let habits: Habit[] = [];
   let entries: HabitEntry[] = [];
+  let accounts: any[] = [];
+  let transactions: any[] = [];
+  let budgets: any[] = [];
 
   try {
     habits = await db.habits.toArray();
     entries = await db.entries.toArray();
+    accounts = await db.accounts.toArray();
+    transactions = await db.transactions.toArray();
+    budgets = await db.budgets.toArray();
   } catch {
     habits = JSON.parse(localStorage.getItem(HABITS_KEY) || '[]');
     entries = JSON.parse(localStorage.getItem(ENTRIES_KEY) || '[]');
   }
 
   const backup = {
-    version: 2,
+    version: 3,
     database: 'dexie_routinix',
     exportedAt: new Date().toISOString(),
     habits,
     entries,
+    accounts,
+    transactions,
+    budgets,
   };
   return JSON.stringify(backup, null, 2);
 }
@@ -283,9 +292,25 @@ export function importBackupJSON(jsonString: string): { habits: Habit[]; entries
   }
   const habits = parsed.habits;
   const entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+  const accounts = Array.isArray(parsed.accounts) ? parsed.accounts : [];
+  const transactions = Array.isArray(parsed.transactions) ? parsed.transactions : [];
+  const budgets = Array.isArray(parsed.budgets) ? parsed.budgets : [];
 
   saveHabits(habits);
   saveEntries(entries);
+
+  if (accounts.length > 0) {
+    db.accounts.bulkPut(accounts).catch(() => {});
+    void syncManager.recordLocal('accounts', accounts);
+  }
+  if (transactions.length > 0) {
+    db.transactions.bulkPut(transactions).catch(() => {});
+    void syncManager.recordLocal('transactions', transactions);
+  }
+  if (budgets.length > 0) {
+    db.budgets.bulkPut(budgets).catch(() => {});
+    void syncManager.recordLocal('budgets', budgets);
+  }
 
   return { habits, entries };
 }
