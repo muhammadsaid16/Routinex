@@ -25,6 +25,8 @@ import {
 import { THEMES, applyTheme, getSavedThemeId } from './themes';
 import { sound } from './audio';
 import { UIScaleOption, applyUIScale, getSavedUIScale, UI_SCALES } from './uiScale';
+import { syncManager } from './sync/syncManager';
+import { loadFromDexie } from './storage';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -48,7 +50,64 @@ export const App: React.FC = () => {
       if (dexieData.habits.length > 0 || dexieData.entries.length > 0) {
         setData(dexieData);
       }
+      syncManager.confirmAppState(dexieData.habits, dexieData.entries);
     });
+  }, []);
+
+  // Device sync: pull records that arrived from the paired device
+  useEffect(() => {
+    return syncManager.onRemoteData(() => {
+      loadFromDexie().then((fresh) => {
+        setData(fresh);
+        syncManager.confirmAppState(fresh.habits, fresh.entries);
+      });
+    });
+  }, []);
+
+  // Device sync: follow preferences that changed on the paired device
+  useEffect(() => {
+    return syncManager.onRemoteSetting((key, value) => {
+      if (key === 'activeThemeId' && typeof value === 'string') {
+        setCurrentThemeId(value);
+        applyTheme(value);
+      } else if (key === 'uiScale' && typeof value === 'string') {
+        setCurrentScale(value as UIScaleOption);
+        applyUIScale(value as UIScaleOption);
+      } else if (key === 'userName' && typeof value === 'string') {
+        setUserName(value);
+        saveUserName(value);
+      }
+    });
+  }, []);
+
+  // Device sync: tell the link which device it is talking to
+  useEffect(() => {
+    syncManager.setDeviceName(userName);
+  }, [userName]);
+
+  // Device sync: bring the pairing back after a page reload
+  useEffect(() => {
+    void syncManager.resumeSession();
+  }, []);
+
+  // Device sync: a scanned QR code opens the app with a pairing code
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pairCode = params.get('pair');
+    if (!pairCode) return;
+
+    params.delete('pair');
+    const cleaned = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${
+      window.location.hash
+    }`;
+    window.history.replaceState({}, '', cleaned);
+
+    setCurrentTab('account');
+
+    // A stored session with the same code is restored by resumeSession().
+    if (syncManager.getSessionCode() === pairCode.replace(/-/g, '').toUpperCase()) return;
+
+    void syncManager.joinWithCode(pairCode);
   }, []);
 
   // Apply theme & UI scale on mount and change

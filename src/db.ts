@@ -1,9 +1,12 @@
 import Dexie, { type Table } from 'dexie';
 import { Habit, HabitEntry } from './types';
+import { Tombstone } from './sync/types';
 
 export interface AppSetting {
   key: string;
   value: any;
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 /**
@@ -15,6 +18,7 @@ export class RoutinixDatabase extends Dexie {
   habits!: Table<Habit, string>;
   entries!: Table<HabitEntry, [string, string]>;
   settings!: Table<AppSetting, string>;
+  tombstones!: Table<Tombstone, string>;
 
   constructor() {
     super('RoutinixDB');
@@ -22,6 +26,12 @@ export class RoutinixDatabase extends Dexie {
       habits: 'id, createdAt, archived',
       entries: '[habitId+date], habitId, date, completed',
       settings: 'key',
+    });
+    this.version(2).stores({
+      habits: 'id, createdAt, archived',
+      entries: '[habitId+date], habitId, date, completed',
+      settings: 'key',
+      tombstones: 'id, table, updatedAt',
     });
   }
 }

@@ -294,6 +294,7 @@ export const THEME_STORAGE_KEY = 'routinix_active_theme_id';
 export const LEGACY_THEME_STORAGE_KEY = 'apex_active_theme_id';
 
 import { db } from './db';
+import { syncManager } from './sync/syncManager';
 
 export function applyTheme(themeId: string) {
   const theme = THEMES.find((t) => t.id === themeId) || THEMES[0];
@@ -307,6 +308,9 @@ export function applyTheme(themeId: string) {
     localStorage.setItem(THEME_STORAGE_KEY, theme.id);
     db.settings.put({ key: 'activeThemeId', value: theme.id }).catch(() => {});
   } catch (e) {}
+
+  // Device sync: the paired device follows the same theme.
+  void syncManager.recordSetting('activeThemeId', theme.id);
 }
 
 export function getSavedThemeId(): string {

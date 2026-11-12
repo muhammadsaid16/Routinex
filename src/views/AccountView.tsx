@@ -4,6 +4,7 @@ import { sound } from '../audio';
 import { exportBackupJSON, importBackupJSON, getInitials } from '../storage';
 import { Habit, HabitEntry } from '../types';
 import { UIScaleOption, UI_SCALES } from '../uiScale';
+import { DeviceSyncPanel } from '../components/DeviceSyncPanel';
 
 interface AccountViewProps {
   onResetDemo: () => void;
@@ -380,6 +381,9 @@ export const AccountView: React.FC<AccountViewProps> = ({
             </div>
           )}
         </div>
+
+        {/* Device Sync & Link */}
+        <DeviceSyncPanel />
 
         {/* Audio Tactile Feedback */}
         <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 flex items-center justify-between">

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routinix-v1';
+const CACHE_NAME = 'routinix-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -29,25 +29,44 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  // The app shell is fetched from the network first, so a new deploy reaches
+  // the phone without clearing the cache by hand.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put('/index.html', copy);
+            cache.put('/', copy.clone());
+          });
+          return response;
+        })
+        .catch(() =>
+          caches.match('/index.html').then((cached) => cached || caches.match('/'))
+        )
+    );
+    return;
+  }
+
+  // Build assets carry a hash in their name, so they never change.
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then((networkResponse) => {
-        // Cache static assets dynamically
+      return fetch(request).then((networkResponse) => {
         if (
           networkResponse &&
           networkResponse.status === 200 &&
-          (event.request.url.includes('/assets/') || event.request.url.includes('/icons/'))
+          (request.url.includes('/assets/') || request.url.includes('/icons/'))
         ) {
           const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return networkResponse;
-      }).catch(() => {
-        // Offline fallback to root
-        return caches.match('/');
-      });
+      }).catch(() => caches.match('/index.html'));
     })
   );
 });

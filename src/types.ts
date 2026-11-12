@@ -10,6 +10,9 @@ export interface Habit {
   // Optional target-based habit (numeric)
   targetValue?: number; // e.g. 20
   unit?: string;        // e.g. 'pages', 'mins', 'L'
+  // Device sync stamps (last-write-wins merge between paired devices)
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 export interface HabitEntry {
@@ -19,6 +22,9 @@ export interface HabitEntry {
   completedAt?: string;
   currentValue?: number; // for numeric habits (e.g. 15/20)
   note?: string;         // optional micro-journal note ("Why did it slip?" or victory note)
+  // Device sync stamps (last-write-wins merge between paired devices)
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 export type CellState = 'done' | 'pending' | 'missed' | 'future' | 'unscheduled';

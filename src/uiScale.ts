@@ -1,4 +1,5 @@
 import { db } from './db';
+import { syncManager } from './sync/syncManager';
 
 export type UIScaleOption = 'compact' | 'normal' | 'large' | 'spacious';
 
@@ -66,6 +67,9 @@ export function applyUIScale(scaleId: UIScaleOption) {
   } catch (e) {
     // fallback
   }
+
+  // Device sync: the paired device follows the same density.
+  void syncManager.recordSetting('uiScale', scaleId);
 }
 
 export function getSavedUIScale(): UIScaleOption {

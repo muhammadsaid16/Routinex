@@ -20,3 +20,6 @@ android/app/build/
 
 .vercel
 .env*
+
+# Local verification artifacts
+.reticle/

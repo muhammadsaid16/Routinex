@@ -1,5 +1,6 @@
 import { Habit, HabitEntry, CellState, ConsistencyStats } from './types';
 import { db, requestPersistentStorage } from './db';
+import { syncManager } from './sync/syncManager';
 
 const HABITS_KEY = 'routinix_habits_v1';
 const ENTRIES_KEY = 'routinix_entries_v1';
@@ -162,7 +163,15 @@ export async function initDexieStorage(): Promise<{ habits: Habit[]; entries: Ha
 }
 
 export function seedSampleData(): { habits: Habit[]; entries: HabitEntry[] } {
-  saveHabitsToLocalStorage(DEFAULT_HABITS);
+  // The starter habits are stamped now, so they are newer than any delete
+  // that the paired device sent earlier for the same habit id.
+  const seeded: Habit[] = DEFAULT_HABITS.map((habit) => ({
+    ...habit,
+    updatedAt: Date.now(),
+    updatedBy: syncManager.getDeviceId(),
+  }));
+
+  saveHabitsToLocalStorage(seeded);
   saveEntriesToLocalStorage([]);
   try {
     localStorage.removeItem(LEGACY_HABITS_KEY);
@@ -171,11 +180,14 @@ export function seedSampleData(): { habits: Habit[]; entries: HabitEntry[] } {
 
   db.transaction('rw', db.habits, db.entries, async () => {
     await db.habits.clear();
-    await db.habits.bulkPut(DEFAULT_HABITS);
+    await db.habits.bulkPut(seeded);
     await db.entries.clear();
   }).catch((err) => console.error('Failed to seed starter habits in Dexie:', err));
 
-  return { habits: DEFAULT_HABITS, entries: [] };
+  void syncManager.recordLocal('habits', seeded);
+  void syncManager.recordLocal('entries', []);
+
+  return { habits: seeded, entries: [] };
 }
 
 export function clearAllData(): { habits: Habit[]; entries: HabitEntry[] } {
@@ -191,29 +203,55 @@ export function clearAllData(): { habits: Habit[]; entries: HabitEntry[] } {
     await db.entries.clear();
   }).catch((err) => console.error('Failed to clear Dexie data:', err));
 
+  void syncManager.recordLocal('habits', []);
+  void syncManager.recordLocal('entries', []);
+
   return { habits: [], entries: [] };
 }
 
 export function saveHabits(habits: Habit[]) {
   saveHabitsToLocalStorage(habits);
 
+  // Upsert only. Records that the user removed are deleted by the sync layer,
+  // so a record that arrives from a paired device is never wiped by a stale array.
   db.transaction('rw', db.habits, async () => {
-    await db.habits.clear();
     if (habits.length > 0) {
       await db.habits.bulkPut(habits);
     }
   }).catch((err) => console.error('Failed to save habits to Dexie:', err));
+
+  // Device sync: stamp the changed habits and push them to the paired device.
+  void syncManager.recordLocal('habits', habits);
 }
 
 export function saveEntries(entries: HabitEntry[]) {
   saveEntriesToLocalStorage(entries);
 
   db.transaction('rw', db.entries, async () => {
-    await db.entries.clear();
     if (entries.length > 0) {
       await db.entries.bulkPut(entries);
     }
   }).catch((err) => console.error('Failed to save entries to Dexie:', err));
+
+  // Device sync: stamp the changed entries and push them to the paired device.
+  void syncManager.recordLocal('entries', entries);
+}
+
+/**
+ * Reads the authoritative state back out of Dexie.
+ * Used after a paired device sends new records.
+ */
+export async function loadFromDexie(): Promise<{ habits: Habit[]; entries: HabitEntry[] }> {
+  try {
+    const habits = await db.habits.toArray();
+    const entries = await db.entries.toArray();
+    saveHabitsToLocalStorage(habits);
+    saveEntriesToLocalStorage(entries);
+    return { habits, entries };
+  } catch (err) {
+    console.error('Failed to read from Dexie:', err);
+    return getInitialData();
+  }
 }
 
 export async function exportBackupJSON(): Promise<string> {
@@ -408,6 +446,7 @@ export function saveUserName(name: string) {
     const trimmed = name.trim();
     localStorage.setItem(USER_NAME_KEY, trimmed);
     db.settings.put({ key: 'userName', value: trimmed }).catch(() => {});
+    void syncManager.recordSetting('userName', trimmed);
   } catch (e) {}
 }
 
