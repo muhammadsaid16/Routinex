@@ -1,6 +1,6 @@
 {
   "packageId": "app.routinex.twa",
-  "host": "localhost:5173",
+  "host": "routinex-one.vercel.app",
   "name": "Routinix - Habit Tracker",
   "launcherName": "Routinix",
   "display": "standalone",
@@ -13,18 +13,18 @@
   "backgroundColor": "#070D19",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "http://localhost:5173/icon-512.png",
-  "maskableIconUrl": "http://localhost:5173/icon-maskable.png",
+  "iconUrl": "https://routinex-one.vercel.app/icon-512.png",
+  "maskableIconUrl": "https://routinex-one.vercel.app/icon-maskable.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1",
-  "appVersionCode": 1,
+  "appVersionName": "1.0.1",
+  "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "http://localhost:5173/manifest.json",
+  "webManifestUrl": "https://routinex-one.vercel.app/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
   "alphaDependencies": {
@@ -33,15 +33,19 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://routinex.app/",
-  "minSdkVersion": 21,
+  "fullScopeUrl": "https://routinex-one.vercel.app/",
+  "minSdkVersion": 24,
   "orientation": "portrait-primary",
-  "fingerprints": [],
+  "fingerprints": [
+    {
+      "value": "32:4D:B7:3C:8C:F7:7C:07:3B:54:60:16:81:E0:91:B0:D1:DB:A6:EE:D6:33:E6:0B:7F:85:50:D2:10:84:10:07"
+    }
+  ],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "protocolHandlers": [],
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1"
+  "appVersion": "1.0.1"
 }

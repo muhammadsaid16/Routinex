@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.routinex.twa",
+      "sha256_cert_fingerprints": [
+        "32:4D:B7:3C:8C:F7:7C:07:3B:54:60:16:81:E0:91:B0:D1:DB:A6:EE:D6:33:E6:0B:7F:85:50:D2:10:84:10:07"
+      ]
+    }
+  }
+]
