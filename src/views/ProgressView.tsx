@@ -3,7 +3,7 @@ import { Habit, HabitEntry, ConsistencyStats } from '../types';
 import { Cell } from '../components/Cell';
 import { resolveCellState, getTodayString, formatDateToISO, getDayOfWeek } from '../storage';
 import { BarChart3, TrendingUp, AlertTriangle, Trophy, ChevronRight } from 'lucide-react';
-import { calculateMilestones } from '../milestones';
+import { calculatePlayerStats } from '../milestones';
 
 interface ProgressViewProps {
   habits: Habit[];
@@ -20,7 +20,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
   onToggleEntry,
   onNavigateToMilestones,
 }) => {
-  const { playerStats } = calculateMilestones(habits, entries, stats);
+  const playerStats = calculatePlayerStats(habits, entries, stats);
   const todayStr = getTodayString();
   const activeHabits = habits.filter((h) => !h.archived);
 
@@ -120,16 +120,16 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wider font-semibold text-ob-gold">
-                Discipline Ranks & Badges
+                Discipline Rank
               </div>
               <div className="text-sm font-bold text-ob-text flex items-center gap-2">
                 <span>Level {playerStats.level}: {playerStats.title}</span>
-                <span className="text-xs font-normal text-ob-dim">({playerStats.unlockedCount}/{playerStats.totalBadgesCount} Badges)</span>
+                <span className="text-xs font-normal text-ob-dim">({playerStats.totalXp} XP)</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-1 text-xs font-semibold text-ob-gold group-hover:translate-x-0.5 transition-transform">
-            <span>Explore Badges & Milestones</span>
+            <span>Explore Your Rank</span>
             <ChevronRight className="w-4 h-4" />
           </div>
         </div>
