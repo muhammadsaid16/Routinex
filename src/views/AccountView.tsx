@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2, Trophy } from 'lucide-react';
 import { sound } from '../audio';
 import { exportBackupJSON, importBackupJSON, getInitials } from '../storage';
 import { Habit, HabitEntry } from '../types';
@@ -17,6 +17,8 @@ interface AccountViewProps {
   onSelectScale: (scale: UIScaleOption) => void;
   userName: string;
   onUpdateUserName: (name: string) => void;
+  milestonesEnabled: boolean;
+  onToggleMilestones: (enabled: boolean) => void;
 }
 
 export const AccountView: React.FC<AccountViewProps> = ({
@@ -30,6 +32,8 @@ export const AccountView: React.FC<AccountViewProps> = ({
   onSelectScale,
   userName,
   onUpdateUserName,
+  milestonesEnabled,
+  onToggleMilestones,
 }) => {
   const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const [soundOn, setSoundOn] = useState<boolean>(sound.isEnabled());
@@ -384,6 +388,34 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
         {/* Device Sync & Link */}
         <DeviceSyncPanel />
+
+        {/* Milestones switch */}
+        <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Trophy className={`w-5 h-5 shrink-0 ${milestonesEnabled ? 'text-ob-gold' : 'text-ob-dim'}`} />
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-ob-text">Milestones &amp; Achievements</div>
+              <div className="text-xs text-ob-dim mt-0.5">
+                {milestonesEnabled
+                  ? 'The rank, the points and the progression are part of the app.'
+                  : 'The milestones system is switched off. The app stays focused on the habits.'}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              sound.playClick();
+              onToggleMilestones(!milestonesEnabled);
+            }}
+            className={`shrink-0 text-xs font-semibold px-3.5 py-1.5 rounded-lg border transition-colors ${
+              milestonesEnabled
+                ? 'bg-ob-gold text-ob-on-gold border-ob-gold'
+                : 'bg-ob-s1 text-ob-dim border-ob-line hover:text-ob-text'
+            }`}
+          >
+            {milestonesEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
 
         {/* Audio Tactile Feedback */}
         <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 flex items-center justify-between">

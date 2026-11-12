@@ -1,4 +1,32 @@
 import { Habit, HabitEntry, ConsistencyStats } from './types';
+import { db } from './db';
+import { syncManager } from './sync/syncManager';
+
+const MILESTONES_KEY = 'routinix_milestones_enabled';
+
+/**
+ * The milestones system can be switched off. When it is off the tab, the
+ * rank card and the whole progression stay out of the app, so the focus is
+ * only on the habits. The choice travels with the paired device.
+ */
+export function getMilestonesEnabled(): boolean {
+  try {
+    const saved = localStorage.getItem(MILESTONES_KEY);
+    if (saved !== null) return saved !== 'false';
+  } catch (e) {
+    // fallback
+  }
+  return true;
+}
+
+export function setMilestonesEnabled(enabled: boolean) {
+  try {
+    localStorage.setItem(MILESTONES_KEY, String(enabled));
+    db.settings.put({ key: 'milestonesEnabled', value: enabled }).catch(() => {});
+  } catch (e) {}
+
+  void syncManager.recordSetting('milestonesEnabled', enabled);
+}
 
 export interface RankLevel {
   level: number;

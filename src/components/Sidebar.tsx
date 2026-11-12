@@ -11,6 +11,7 @@ interface SidebarProps {
   consistencyPercentage: number;
   onOpenTheme: () => void;
   userName?: string;
+  showMilestones?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -19,13 +20,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   consistencyPercentage,
   onOpenTheme,
   userName = 'Operator',
+  showMilestones = true,
 }) => {
   const initials = getInitials(userName);
   const navItems = [
     { id: 'dashboard' as NavTab, label: 'Overview', icon: LayoutDashboard },
     { id: 'habits' as NavTab, label: 'Habits', icon: CheckSquare },
     { id: 'progress' as NavTab, label: 'Progress', icon: BarChart3 },
-    { id: 'milestones' as NavTab, label: 'Milestones', icon: Trophy },
+    ...(showMilestones ? [{ id: 'milestones' as NavTab, label: 'Milestones', icon: Trophy }] : []),
     { id: 'coach' as NavTab, label: 'Coach', icon: Bot },
   ];
 

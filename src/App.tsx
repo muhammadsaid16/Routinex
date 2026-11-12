@@ -27,6 +27,7 @@ import { sound } from './audio';
 import { UIScaleOption, applyUIScale, getSavedUIScale, UI_SCALES } from './uiScale';
 import { syncManager } from './sync/syncManager';
 import { loadFromDexie } from './storage';
+import { getMilestonesEnabled, setMilestonesEnabled } from './milestones';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
   const [userName, setUserName] = useState<string>(getSavedUserName);
   const [currentThemeId, setCurrentThemeId] = useState<string>(getSavedThemeId);
   const [currentScale, setCurrentScale] = useState<UIScaleOption>(getSavedUIScale);
+  const [milestonesEnabled, setMilestonesState] = useState<boolean>(getMilestonesEnabled);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [selectedHabitIndex, setSelectedHabitIndex] = useState(0);
@@ -76,6 +78,9 @@ export const App: React.FC = () => {
       } else if (key === 'userName' && typeof value === 'string') {
         setUserName(value);
         saveUserName(value);
+      } else if (key === 'milestonesEnabled' && typeof value === 'boolean') {
+        setMilestonesState(value);
+        setMilestonesEnabled(value);
       }
     });
   }, []);
@@ -335,6 +340,7 @@ export const App: React.FC = () => {
         consistencyPercentage={stats.percentage}
         onOpenTheme={() => setIsThemeModalOpen(true)}
         userName={userName}
+        showMilestones={milestonesEnabled}
       />
 
       {/* Main Content Area */}
@@ -366,11 +372,11 @@ export const App: React.FC = () => {
             entries={entries}
             stats={stats}
             onToggleEntry={handleToggleEntry}
-            onNavigateToMilestones={() => setCurrentTab('milestones')}
+            onNavigateToMilestones={milestonesEnabled ? () => setCurrentTab('milestones') : undefined}
           />
         )}
 
-        {currentTab === 'milestones' && (
+        {currentTab === 'milestones' && milestonesEnabled && (
           <MilestonesView
             habits={habits}
             entries={entries}
@@ -397,6 +403,15 @@ export const App: React.FC = () => {
             onUpdateUserName={(name) => {
               setUserName(name);
               saveUserName(name);
+            }}
+            milestonesEnabled={milestonesEnabled}
+            onToggleMilestones={(enabled) => {
+              setMilestonesState(enabled);
+              setMilestonesEnabled(enabled);
+              if (!enabled) {
+                sound.playClick();
+                setCurrentTab((tab) => (tab === 'milestones' ? 'dashboard' : tab));
+              }
             }}
           />
         )}
