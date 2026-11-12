@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Production build
+dist/
+dist-ssr/
+
+# Logs & temp
+*.log
+.vite.log
+.DS_Store
+.env.local
+.env.*.local

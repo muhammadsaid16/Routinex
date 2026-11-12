@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ob-canvas: #070d19;
+  --ob-sidebar: #0a1222;
+  --ob-s1: #0f1a30;
+  --ob-s2: #14223d;
+  --ob-raised: #1a2a4a;
+  --ob-text: #f0f9ff;
+  --ob-text-2: #94a3b8;
+  --ob-muted: #64748b;
+  --ob-dim: #475569;
+  --ob-line: rgba(56, 189, 248, 0.1);
+  --ob-line-strong: rgba(56, 189, 248, 0.2);
+  --ob-grid: rgba(56, 189, 248, 0.04);
+  --ob-gold: #38bdf8;
+  --ob-gold-bright: #7dd3fc;
+  --ob-gold-muted: #0284c7;
+  --ob-gold-wash: rgba(56, 189, 248, 0.12);
+  --ob-gold-wash-faint: rgba(56, 189, 248, 0.04);
+  --ob-on-gold: #04101e;
+  --ob-cell-miss: #1e293b;
+  --ob-cell-future: #0f172a;
+  --ob-track: #1e293b;
+  --ob-bar: #64748b;
+  --ob-danger: #f43f5e;
+
+  --sys-cell: 24px;
+}
+
+body {
+  margin: 0;
+  background-color: var(--ob-canvas);
+  color: var(--ob-text);
+  font-family: 'Geist', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ob-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ob-line-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ob-dim);
+}
+
+/* Cell System States */
+.sys-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sys-cell);
+  height: var(--sys-cell);
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: all 0.15s ease-out;
+  user-select: none;
+}
+
+/* 1. Done */
+.sys-cell[data-state="done"] {
+  background-color: var(--ob-gold);
+  border: 1.5px solid var(--ob-gold);
+  color: var(--ob-on-gold);
+}
+.sys-cell[data-state="done"] svg {
+  stroke: var(--ob-on-gold);
+  stroke-width: 2.8;
+}
+
+/* 2. Pending (Today's due habit) */
+.sys-cell[data-state="pending"] {
+  border: 1.5px solid var(--ob-gold);
+  background-color: transparent;
+  cursor: pointer;
+}
+.sys-cell[data-state="pending"]:hover {
+  background-color: var(--ob-gold-wash);
+  transform: scale(1.05);
+}
+
+/* 3. Missed (Past scheduled but not done) */
+.sys-cell[data-state="missed"] {
+  border: 1.5px solid #3d3c36;
+  background-color: #151614;
+}
+
+/* 4. Future (Upcoming scheduled) */
+.sys-cell[data-state="future"] {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sys-cell[data-state="future"]::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #2b2b27;
+}
+
+/* 5. Unscheduled */
+.sys-cell[data-state="unscheduled"] {
+  background-color: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.02);
+  opacity: 0.3;
+}
