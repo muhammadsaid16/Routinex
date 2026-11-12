@@ -12,9 +12,16 @@ import {
   Radio,
   ShieldCheck,
   Camera,
+  Globe,
 } from 'lucide-react';
 import { syncManager } from '../sync/syncManager';
 import { SyncState } from '../sync/types';
+import {
+  describeBroker,
+  loadBroker,
+  parseBrokerAddress,
+  saveBroker,
+} from '../sync/syncManager';
 import { formatPairingCode, normalizePairingCode, buildPairingUrl } from '../sync/code';
 import { sound } from '../audio';
 import { QrScanner } from './QrScanner';
@@ -43,6 +50,9 @@ export const DeviceSyncPanel: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [isBrokerOpen, setIsBrokerOpen] = useState<boolean>(false);
+  const [brokerInput, setBrokerInput] = useState<string>(describeBroker(loadBroker()));
+  const [brokerNote, setBrokerNote] = useState<string | null>(null);
 
   useEffect(() => syncManager.subscribe(setState), []);
 
@@ -106,6 +116,18 @@ export const DeviceSyncPanel: React.FC = () => {
     setInputCode(normalized);
     void syncManager.joinWithCode(normalized);
   }, []);
+
+  const handleSaveBroker = () => {
+    const broker = parseBrokerAddress(brokerInput);
+    if (!broker) {
+      setBrokerNote('That address does not look right. Try https://host or http://host:9000');
+      return;
+    }
+    saveBroker(broker);
+    setBrokerInput(describeBroker(broker));
+    setBrokerNote('Saved. Start a new pairing to use it.');
+    sound.playClick();
+  };
 
   const handleCopy = async () => {
     if (!formattedCode) return;
@@ -344,6 +366,49 @@ export const DeviceSyncPanel: React.FC = () => {
         onClose={() => setIsScannerOpen(false)}
         onDetected={handleDetected}
       />
+
+      {/* Signalling server */}
+      <div className="pt-1 border-t border-ob-line">
+        <button
+          onClick={() => {
+            sound.playClick();
+            setIsBrokerOpen((prev) => !prev);
+            setBrokerNote(null);
+          }}
+          className="text-[11px] text-ob-dim hover:text-ob-gold transition-colors flex items-center gap-1.5"
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span>Signalling server: {describeBroker(loadBroker())}</span>
+        </button>
+
+        {isBrokerOpen && (
+          <div className="mt-2 space-y-2">
+            <p className="text-[11px] text-ob-muted leading-relaxed">
+              The public broker limits how many devices can pair from one address. Point both
+              devices at your own broker when that happens.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={brokerInput}
+                onChange={(e) => setBrokerInput(e.target.value)}
+                placeholder="https://0.peerjs.com"
+                spellCheck={false}
+                autoComplete="off"
+                className="bg-ob-raised border border-ob-line px-2.5 py-2 text-xs font-mono text-ob-text rounded-lg outline-none focus:ring-1 focus:ring-ob-gold flex-1 min-w-0"
+              />
+              <button
+                onClick={handleSaveBroker}
+                className="px-3 py-2 rounded-lg bg-ob-raised border border-ob-line-strong text-xs font-bold text-ob-text hover:border-ob-gold hover:text-ob-gold transition-colors"
+              >
+                Save
+              </button>
+            </div>
+            {brokerNote && (
+              <p className="text-[11px] text-ob-gold">{brokerNote}</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

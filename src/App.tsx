@@ -90,6 +90,22 @@ export const App: React.FC = () => {
     void syncManager.resumeSession();
   }, []);
 
+  // Device sync: the browser freezes timers in a background tab, so the link
+  // is repaired as soon as the app comes back to the front
+  useEffect(() => {
+    const wake = () => syncManager.handleAppWake();
+    window.addEventListener('focus', wake);
+    window.addEventListener('pageshow', wake);
+    window.addEventListener('online', wake);
+    document.addEventListener('visibilitychange', wake);
+    return () => {
+      window.removeEventListener('focus', wake);
+      window.removeEventListener('pageshow', wake);
+      window.removeEventListener('online', wake);
+      document.removeEventListener('visibilitychange', wake);
+    };
+  }, []);
+
   // Device sync: a scanned QR code opens the app with a pairing code
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

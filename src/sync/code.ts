@@ -72,13 +72,24 @@ function base32Encode(bytes: Uint8Array, length: number): string {
 }
 
 /**
- * Derives the signalling peer id from the pairing code.
+ * Derives the signalling peer id of the device that waits for a device.
  * The broker can brute force this id, but not the code behind it.
  */
 export async function derivePeerId(code: string): Promise<string> {
   const normalized = normalizePairingCode(code);
   const digest = sha256(utf8Bytes('routinix.device-sync.peer|' + normalized));
   return 'routinix-' + base32Encode(digest, 16).toLowerCase();
+}
+
+/**
+ * Derives the signalling peer id of the device that joins a device.
+ * The id is stable for the pairing code, so the waiting device can call the
+ * other device back after a reload, even when the other device is asleep.
+ */
+export async function deriveGuestPeerId(code: string): Promise<string> {
+  const normalized = normalizePairingCode(code);
+  const digest = sha256(utf8Bytes('routinix.device-sync.peer-guest|' + normalized));
+  return 'routinix-g' + base32Encode(digest, 16).toLowerCase();
 }
 
 export function buildPairingUrl(code: string, origin: string): string {

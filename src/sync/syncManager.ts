@@ -1,7 +1,7 @@
 import Peer, { DataConnection, PeerJSOption } from 'peerjs';
 import { db } from '../db';
 import { authProof, decryptPayload, deriveSyncKey, encryptPayload } from './cipher';
-import { derivePeerId, generatePairingCode, normalizePairingCode } from './code';
+import { deriveGuestPeerId, derivePeerId, generatePairingCode, normalizePairingCode } from './code';
 import {
   SyncMessage,
   SyncState,
@@ -15,14 +15,92 @@ import {
 
 const DEVICE_ID_KEY = 'routinix_device_id';
 const SESSION_KEY = 'routinix_sync_session';
+const BROKER_KEY = 'routinix_sync_broker';
 const MAX_TOMBSTONES = 800;
 const PING_INTERVAL_MS = 25000;
-const CONNECT_TIMEOUT_MS = 25000;
+const CONNECT_TIMEOUT_MS = 8000;
 const MAX_RECONNECT_ATTEMPTS = 60;
+const GUEST_DIAL_DELAY_MS = 6000;
 
 interface SyncSession {
   role: 'host' | 'guest';
   code: string;
+}
+
+export interface BrokerConfig {
+  host: string;
+  port: number;
+  path: string;
+  secure: boolean;
+}
+
+function defaultBroker(): BrokerConfig {
+  const env = (import.meta.env || {}) as Record<string, string | undefined>;
+  return {
+    host: env.VITE_PEER_HOST || '0.peerjs.com',
+    port: env.VITE_PEER_PORT ? Number(env.VITE_PEER_PORT) : 443,
+    path: env.VITE_PEER_PATH || '/',
+    secure: env.VITE_PEER_SECURE ? env.VITE_PEER_SECURE !== 'false' : true,
+  };
+}
+
+/**
+ * The signalling broker that introduces two devices to each other.
+ * The public broker limits the number of connections, so a private broker
+ * can be used instead. The setting is kept on the device.
+ */
+export function loadBroker(): BrokerConfig {
+  try {
+    const raw = localStorage.getItem(BROKER_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.host === 'string' && parsed.host) {
+        return { ...defaultBroker(), ...parsed };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return defaultBroker();
+}
+
+export function saveBroker(broker: BrokerConfig): void {
+  try {
+    localStorage.setItem(BROKER_KEY, JSON.stringify(broker));
+  } catch {
+    /* storage blocked */
+  }
+}
+
+/**
+ * Turns a broker address such as https://broker.example.com or
+ * http://192.168.1.10:9000 into the settings the peer client needs.
+ */
+export function parseBrokerAddress(input: string): BrokerConfig | null {
+  const value = (input || '').trim();
+  if (!value) return null;
+
+  const withProtocol = /^[a-z]+:\/\//i.test(value) ? value : `https://${value}`;
+
+  try {
+    const url = new URL(withProtocol);
+    return {
+      host: url.hostname,
+      port: url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80,
+      path: url.pathname && url.pathname !== '/' ? url.pathname : '/',
+      secure: url.protocol === 'https:' || url.protocol === 'wss:',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function describeBroker(broker: BrokerConfig): string {
+  const scheme = broker.secure ? 'https' : 'http';
+  const port = (broker.secure && broker.port === 443) || (!broker.secure && broker.port === 80)
+    ? ''
+    : `:${broker.port}`;
+  return `${scheme}://${broker.host}${port}`;
 }
 
 type StateListener = (state: SyncState) => void;
@@ -31,11 +109,14 @@ type SettingListener = (key: string, value: any) => void;
 
 function peerOptions(peerId: string): PeerJSOption {
   const env = (import.meta.env || {}) as Record<string, string | undefined>;
+  const broker = loadBroker();
   const options: PeerJSOption = { debug: 0 };
-  if (env.VITE_PEER_HOST) options.host = env.VITE_PEER_HOST;
-  if (env.VITE_PEER_PORT) options.port = Number(env.VITE_PEER_PORT);
-  if (env.VITE_PEER_PATH) options.path = env.VITE_PEER_PATH;
-  if (env.VITE_PEER_SECURE) options.secure = env.VITE_PEER_SECURE !== 'false';
+
+  options.host = broker.host;
+  options.port = broker.port;
+  options.path = broker.path;
+  options.secure = broker.secure;
+
   if (env.VITE_PEER_KEY) options.key = env.VITE_PEER_KEY;
 
   // The broker keeps a peer id while the old socket is still open. Reusing the
@@ -138,6 +219,8 @@ class SyncManager {
 
   private peer: Peer | null = null;
   private conn: DataConnection | null = null;
+  private activeConn: DataConnection | null = null;
+  private conns = new Set<DataConnection>();
   private key: Uint8Array | null = null;
   private nonce: string | null = null;
   private authenticated = false;
@@ -146,8 +229,12 @@ class SyncManager {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private guestDialTimer: ReturnType<typeof setTimeout> | null = null;
   private retryCount = 0;
   private session: SyncSession | null = null;
+  private useRandomGuestId = false;
+  /** True while a call is being set up. No second call starts meanwhile. */
+  private connecting = false;
   private suppressBroadcast = 0;
 
   private baseline: {
@@ -235,6 +322,7 @@ class SyncManager {
   // ------------------------------------------------------------- public API
 
   async startHosting(existingCode?: string, isRetry = false): Promise<string> {
+    this.connecting = true;
     await this.teardown();
 
     const code = existingCode ? normalizePairingCode(existingCode) : generatePairingCode();
@@ -253,19 +341,35 @@ class SyncManager {
     });
 
     const peerId = await derivePeerId(code);
+    this.connecting = true;
     this.peer = new Peer(peerId, peerOptions(peerId));
     const peer = this.peer;
 
     peer.on('open', () => {
       if (this.peer !== peer) return;
+      this.connecting = false;
       if (this.state.phase === 'hosting') {
         this.emitState({ phase: 'hosting' });
+      }
+
+      // After a reload the other device may be asleep with its timer frozen.
+      // Calling it back restores the link without waiting for its timer. The
+      // delay gives the other device time to call back on its own first.
+      if (isRetry && this.session?.role === 'host') {
+        this.guestDialTimer = setTimeout(() => {
+          if (this.peer !== peer || this.authenticated) return;
+          void deriveGuestPeerId(code).then((guestId) => {
+            if (this.peer !== peer || this.authenticated) return;
+            const conn = peer.connect(guestId, { reliable: true, serialization: 'json' });
+            this.attachConnection(conn, 'outgoing');
+          });
+        }, GUEST_DIAL_DELAY_MS);
       }
     });
 
     peer.on('connection', (conn) => {
       if (this.peer !== peer) return;
-      this.attachConnection(conn, 'host');
+      this.attachConnection(conn, 'incoming');
     });
 
     peer.on('disconnected', () => {
@@ -276,6 +380,7 @@ class SyncManager {
 
     peer.on('error', (err) => {
       if (this.peer !== peer) return;
+      this.connecting = false;
       this.handlePeerError(err);
     });
 
@@ -289,6 +394,7 @@ class SyncManager {
       return;
     }
 
+    this.connecting = true;
     await this.teardown();
 
     this.key = deriveSyncKey(code);
@@ -305,14 +411,18 @@ class SyncManager {
     });
 
     const peerId = await derivePeerId(code);
-    const guestId = `routinix-guest-${Math.random().toString(36).slice(2, 10)}`;
+    const guestId = this.useRandomGuestId
+      ? `routinix-guest-${Math.random().toString(36).slice(2, 10)}`
+      : await deriveGuestPeerId(code);
+    this.connecting = true;
     this.peer = new Peer(guestId, peerOptions(guestId));
     const peer = this.peer;
 
     peer.on('open', () => {
       if (this.peer !== peer) return;
+      this.connecting = false;
       const conn = peer.connect(peerId, { reliable: true, serialization: 'json' });
-      this.attachConnection(conn, 'guest');
+      this.attachConnection(conn, 'outgoing');
     });
 
     peer.on('disconnected', () => {
@@ -323,11 +433,15 @@ class SyncManager {
 
     peer.on('error', (err) => {
       if (this.peer !== peer) return;
+      this.connecting = false;
       this.handlePeerError(err);
     });
 
     this.connectTimer = setTimeout(() => {
       if (!this.authenticated && this.state.phase === 'connecting') {
+        // The call did not come through. A fresh peer id clears a stale
+        // channel that the broker may still hold from the page before.
+        if (this.state.role === 'guest') this.useRandomGuestId = true;
         this.emitState({
           phase: 'error',
           error: 'Could not reach the other device. Check the code and that both devices are online.',
@@ -583,23 +697,30 @@ class SyncManager {
 
   // ------------------------------------------------------------- connection
 
-  private attachConnection(conn: DataConnection, role: 'host' | 'guest') {
+  private attachConnection(conn: DataConnection, direction: 'incoming' | 'outgoing') {
+    this.conns.add(conn);
     this.conn = conn;
 
     conn.on('open', () => {
-      if (role === 'host') {
+      // The device that accepted the connection sends the challenge.
+      // Either side may call the other, so the link also comes back when the
+      // waiting device is the one that was reloaded.
+      if (direction === 'incoming') {
         this.nonce = this.makeNonce();
-        this.sendPlain({ t: 'challenge', nonce: this.nonce });
+        this.sendPlain({ t: 'challenge', nonce: this.nonce }, conn);
       }
     });
 
-    conn.on('data', (data: any) => this.handleIncomingData(data));
+    conn.on('data', (data: any) => this.handleIncomingData(data, conn));
 
-    conn.on('close', () => this.handleDisconnect());
+    conn.on('close', () => {
+      this.conns.delete(conn);
+      if (this.activeConn && this.activeConn !== conn) return;
+      this.handleDisconnect();
+    });
 
     conn.on('error', (err: any) => {
       console.error('Sync connection error:', err);
-      this.handleDisconnect();
     });
   }
 
@@ -615,7 +736,7 @@ class SyncManager {
       .join('');
   }
 
-  private handleIncomingData(data: any) {
+  private handleIncomingData(data: any, conn?: DataConnection) {
     let message: SyncMessage | null = null;
 
     try {
@@ -632,15 +753,15 @@ class SyncManager {
       return;
     }
 
-    void this.processMessage(message);
+    void this.processMessage(message, conn);
   }
 
-  private async processMessage(message: SyncMessage): Promise<void> {
+  private async processMessage(message: SyncMessage, conn?: DataConnection): Promise<void> {
     switch (message.t) {
       case 'challenge': {
         if (!this.key) return;
         this.nonce = message.nonce;
-        this.sendPlain({ t: 'auth', proof: authProof(this.key, message.nonce) });
+        this.sendPlain({ t: 'auth', proof: authProof(this.key, message.nonce) }, conn);
         return;
       }
 
@@ -653,12 +774,15 @@ class SyncManager {
           return;
         }
         this.authenticated = true;
-        this.sendPlain({
-          t: 'welcome',
-          deviceName: this.deviceName,
-          proof: expected,
-        });
-        this.onAuthenticated();
+        this.sendPlain(
+          {
+            t: 'welcome',
+            deviceName: this.deviceName,
+            proof: expected,
+          },
+          conn
+        );
+        this.onAuthenticated(conn);
         return;
       }
 
@@ -672,7 +796,7 @@ class SyncManager {
         }
         this.authenticated = true;
         this.emitState({ peerName: message.deviceName });
-        this.onAuthenticated();
+        this.onAuthenticated(conn);
         return;
       }
 
@@ -703,12 +827,33 @@ class SyncManager {
     }
   }
 
-  private onAuthenticated() {
+  private onAuthenticated(conn?: DataConnection) {
     if (this.connectTimer) {
       clearTimeout(this.connectTimer);
       this.connectTimer = null;
     }
+    if (this.guestDialTimer) {
+      clearTimeout(this.guestDialTimer);
+      this.guestDialTimer = null;
+    }
 
+    // Both devices may call each other. The channel that authenticated first
+    // stays open, every other channel is closed.
+    if (conn) {
+      this.activeConn = conn;
+      this.conn = conn;
+      for (const other of Array.from(this.conns)) {
+        if (other === conn) continue;
+        try {
+          other.close();
+        } catch {
+          /* ignore */
+        }
+        this.conns.delete(other);
+      }
+    }
+
+    this.retryCount = 0;
     this.emitState({
       phase: 'connected',
       linked: true,
@@ -735,6 +880,7 @@ class SyncManager {
     const wasLinked = this.authenticated;
     this.authenticated = false;
     this.conn = null;
+    this.activeConn = null;
     this.nonce = null;
 
     if (this.state.phase === 'idle') return;
@@ -745,15 +891,41 @@ class SyncManager {
       phase: wasLinked ? (stillHosting ? 'hosting' : 'idle') : this.state.phase,
       linked: false,
       peerName: null,
-      error: wasLinked ? 'The link to the other device closed. Trying to reconnect...' : this.state.error,
+      error: wasLinked
+        ? stillHosting
+          ? 'The other device disconnected. It reconnects by itself when it is back.'
+          : 'The link to the other device closed. Trying to reconnect...'
+        : this.state.error,
     });
 
     // A reload on the guest drops the data channel. The pairing code stays
-    // the same, so the link comes back on its own. The host only waits for
-    // the guest to come back, it keeps its peer registered.
+    // the same, so the link comes back on its own. The host calls the other
+    // device back, it does not wait for a timer that may be frozen.
     if (this.session && this.state.role === 'guest') {
       this.scheduleReconnect();
     }
+  }
+
+  /**
+   * Called when the app comes back to the front.
+   * Browsers freeze timers in a background tab, so the retry may not have
+   * run yet. This starts the retry right away.
+   */
+  handleAppWake(): void {
+    if (!this.session || this.state.linked) return;
+    if (this.state.phase === 'idle') return;
+
+    // A call is already on its way. Starting another one would drop it.
+    if (this.connecting) return;
+    if (this.peer && this.peer.open) return;
+
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+
+    this.retryCount = 0;
+    void this.attemptReconnect();
   }
 
   private handlePeerError(err: any) {
@@ -764,6 +936,9 @@ class SyncManager {
       message = 'No device is answering with that pairing code.';
     } else if (type === 'unavailable-id') {
       message = 'That pairing code is already in use. Generate a new one.';
+      // Another device already holds this guest id. A random id still works,
+      // because the two devices can call each other.
+      if (this.state.role === 'guest') this.useRandomGuestId = true;
     } else if (type === 'network' || type === 'socket-error' || type === 'server-error') {
       message = 'Could not reach the signalling server. Check the connection.';
     } else if (type === 'browser-not-supported') {
@@ -784,12 +959,16 @@ class SyncManager {
   }
 
   private closeConnection() {
-    try {
-      this.conn?.close();
-    } catch {
-      /* ignore */
+    for (const conn of Array.from(this.conns)) {
+      try {
+        conn.close();
+      } catch {
+        /* ignore */
+      }
     }
+    this.conns.clear();
     this.conn = null;
+    this.activeConn = null;
     this.authenticated = false;
   }
 
@@ -805,6 +984,10 @@ class SyncManager {
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
+    }
+    if (this.guestDialTimer) {
+      clearTimeout(this.guestDialTimer);
+      this.guestDialTimer = null;
     }
 
     this.closeConnection();
@@ -825,19 +1008,22 @@ class SyncManager {
 
   // ------------------------------------------------------------- transport
 
-  private sendPlain(message: SyncMessage) {
-    if (!this.conn || this.conn.open !== true) return;
+  private sendPlain(message: SyncMessage, conn?: DataConnection) {
+    const target = conn || this.activeConn || this.conn;
+    if (!target || target.open !== true) return;
     try {
-      this.conn.send(message as any);
+      target.send(message as any);
     } catch (err) {
       console.error('Sync send failed:', err);
     }
   }
 
   private send(message: SyncMessage) {
-    if (!this.key || !this.conn || this.conn.open !== true) return;
+    if (!this.key) return;
+    const target = this.activeConn || this.conn;
+    if (!target || target.open !== true) return;
     try {
-      this.conn.send({ t: 'enc', p: encryptPayload(this.key, message) } as any);
+      target.send({ t: 'enc', p: encryptPayload(this.key, message) } as any);
       this.emitState({ changesSent: this.state.changesSent + 1 });
     } catch (err) {
       console.error('Sync send failed:', err);

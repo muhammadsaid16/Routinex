@@ -45,7 +45,37 @@ network or a closed laptop therefore does not end the pairing:
 - the guest reconnects to that peer id
 - both devices exchange a fresh snapshot when the link is back
 
-The link comes back by itself within a few seconds.
+The link comes back by itself within a few seconds. Two devices call each
+other, so a device that sleeps with a frozen timer is still reached. Browsers
+freeze timers in a background tab, so the app also repairs the link as soon as
+it comes back to the front.
+
+## The signalling broker
+
+The broker only introduces two devices to each other. The public PeerJS broker
+limits how many devices may pair from one address, so a private broker can be
+used instead:
+
+```bash
+npm run signal          # listens on http://localhost:9000
+```
+
+Point the app at it from **Device Sync & Link → Signalling server**, or with the
+environment variables before a build:
+
+```bash
+VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_SECURE=false npm run build
+```
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `VITE_PEER_HOST` | broker host | `0.peerjs.com` |
+| `VITE_PEER_PORT` | broker port | `443` |
+| `VITE_PEER_PATH` | broker path prefix | `/` |
+| `VITE_PEER_SECURE` | `false` for a plain http broker | `true` |
+
+A page on `https` cannot call a plain `http` broker. For the deployed app the
+broker therefore needs a certificate, for example through a tunnel.
 
 ## What travels over the link
 
@@ -86,27 +116,6 @@ that watches the traffic cannot recover the code.
 The peer id that the devices register with the broker is
 `SHA-256('routinix.device-sync.peer|' + code)`. The broker sees the peer id but
 not the code.
-
-## The broker
-
-By default the app uses the public PeerJS broker. Run your own broker with:
-
-```bash
-npm run signal          # listens on http://localhost:9000
-```
-
-Then point the app at it before you build:
-
-```bash
-VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_SECURE=false npm run build
-```
-
-| Variable | Meaning | Default |
-| --- | --- | --- |
-| `VITE_PEER_HOST` | broker host | `0.peerjs.com` |
-| `VITE_PEER_PORT` | broker port | `443` |
-| `VITE_PEER_PATH` | broker path prefix | `/` |
-| `VITE_PEER_SECURE` | `false` for a plain http broker | `true` |
 
 ## Files
 
