@@ -87,7 +87,11 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
             <span>Strongest Day</span>
           </div>
           <div className="text-3xl font-bold text-ob-text">{stats.bestDay}</div>
-          <div className="text-xs text-ob-dim">Your highest consistency rate of the week.</div>
+          <div className="text-xs text-ob-dim">
+            {stats.bestDay && stats.bestDay !== '—'
+              ? 'Your highest consistency rate of the week.'
+              : 'Log completions to reveal your peak day.'}
+          </div>
         </div>
 
         <div className="rounded-xl border border-ob-line bg-ob-s1 p-5 space-y-1">
@@ -96,7 +100,11 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
             <span>Vulnerability Day</span>
           </div>
           <div className="text-3xl font-bold text-ob-text">{stats.worstDay}</div>
-          <div className="text-xs text-ob-dim">Spot the day that slips and prepare safeguards.</div>
+          <div className="text-xs text-ob-dim">
+            {stats.worstDay && stats.worstDay !== '—' && stats.worstDay !== 'None'
+              ? 'Spot the day that slips and prepare safeguards.'
+              : 'No vulnerability detected yet.'}
+          </div>
         </div>
       </div>
 
@@ -195,17 +203,22 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-7 gap-3">
-          {dayOfWeekCounts.map((item) => (
-            <div
-              key={item.dow}
-              className={`rounded-lg border p-3 flex flex-col justify-between ${
-                item.name === stats.worstDay
-                  ? 'border-ob-danger/40 bg-ob-danger/5'
-                  : item.name === stats.bestDay
-                  ? 'border-ob-gold/40 bg-ob-gold/5'
-                  : 'border-ob-line bg-ob-s1'
-              }`}
-            >
+          {dayOfWeekCounts.map((item) => {
+            const hasData = item.scheduled > 0 && stats.completed > 0;
+            const isWorst = hasData && stats.worstDay !== '—' && stats.worstDay !== 'None' && item.name === stats.worstDay && stats.bestDay !== stats.worstDay;
+            const isBest = hasData && stats.bestDay !== '—' && stats.bestDay !== 'None' && item.name === stats.bestDay;
+
+            return (
+              <div
+                key={item.dow}
+                className={`rounded-lg border p-3 flex flex-col justify-between transition-colors ${
+                  isWorst
+                    ? 'border-ob-danger/40 bg-ob-danger/5'
+                    : isBest
+                    ? 'border-ob-gold/40 bg-ob-gold/5'
+                    : 'border-ob-line bg-ob-s1'
+                }`}
+              >
               <div className="text-xs font-semibold text-ob-dim flex items-center justify-between">
                 <span>{item.name}</span>
                 <span className="text-[10px] font-mono text-ob-muted">
@@ -222,7 +235,8 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
                 />
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       </div>
     </div>

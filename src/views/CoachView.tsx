@@ -40,9 +40,13 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
     }
   });
 
+  const hasStats = stats.scheduled > 0 && stats.completed > 0 && stats.bestDay !== '—';
+
   const initialCoachMessage = consecutiveMisses.length > 0
     ? `I noticed you missed "${consecutiveMisses[0]}" on consecutive days. Missing twice isn't the problem; letting it turn into a week is. Show up tomorrow. No drama.`
-    : `Your 30-day consistency sits at ${stats.percentage}%. Your strongest day is ${stats.bestDay}, while ${stats.worstDay} slips most often. What's the friction on ${stats.worstDay}?`;
+    : hasStats
+    ? `Your 30-day consistency sits at ${stats.percentage}%. Your strongest day is ${stats.bestDay}, while ${stats.worstDay !== 'None' ? stats.worstDay : 'no day'} slips most often. Keep the momentum going.`
+    : `Welcome to Routinix! Create your daily habits and start logging your progress. Consistency is built day by day, not in a single leap.`;
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -86,7 +90,9 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
   };
 
   const quickPrompts = [
-    `Why do I slip on ${stats.worstDay}?`,
+    stats.worstDay && stats.worstDay !== '—' && stats.worstDay !== 'None'
+      ? `Why do I slip on ${stats.worstDay}?`
+      : 'How do I build lasting consistency?',
     'How do I fix my consistency score?',
     'I missed two days in a row, what now?',
   ];

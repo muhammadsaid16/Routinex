@@ -326,23 +326,30 @@ export function calculateStats(
   }
 
   const dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  let bestDay = 'Mon';
-  let worstDay = 'Sun';
-  let bestRate = -1;
-  let worstRate = 2;
+  let bestDay = '—';
+  let worstDay = '—';
 
-  for (let d = 1; d <= 7; d++) {
-    const stat = dayOfWeekStats[d];
-    if (stat.scheduled > 0) {
-      const rate = stat.completed / stat.scheduled;
-      if (rate > bestRate) {
-        bestRate = rate;
-        bestDay = dayNames[d];
+  if (completed > 0) {
+    let bestRate = -1;
+    let worstRate = 2;
+
+    for (let d = 1; d <= 7; d++) {
+      const stat = dayOfWeekStats[d];
+      if (stat.scheduled > 0) {
+        const rate = stat.completed / stat.scheduled;
+        if (rate > bestRate) {
+          bestRate = rate;
+          bestDay = dayNames[d];
+        }
+        if (rate < worstRate) {
+          worstRate = rate;
+          worstDay = dayNames[d];
+        }
       }
-      if (rate < worstRate) {
-        worstRate = rate;
-        worstDay = dayNames[d];
-      }
+    }
+
+    if (worstRate === bestRate || worstRate === 1) {
+      worstDay = 'None';
     }
   }
 
