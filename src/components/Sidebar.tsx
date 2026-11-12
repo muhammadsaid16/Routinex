@@ -1,6 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, CheckSquare, BarChart3, Trophy, Bot, Settings, Palette } from 'lucide-react';
 import { getInitials } from '../storage';
+import { THEMES } from '../themes';
 
 export type NavTab = 'dashboard' | 'habits' | 'progress' | 'milestones' | 'coach' | 'account';
 
@@ -69,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13px] font-medium text-ob-dim hover:text-ob-gold hover:bg-ob-s1 transition-colors mt-2"
             >
               <Palette className="w-4 h-4 text-ob-gold" />
-              <span>Themes (8)</span>
+              <span>Themes ({THEMES.length})</span>
             </button>
           </nav>
         </div>

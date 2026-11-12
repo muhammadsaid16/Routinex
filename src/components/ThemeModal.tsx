@@ -34,7 +34,9 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-ob-text">Theme Gallery</h2>
-              <p className="text-xs text-ob-dim">Choose from 9 bespoke minimal and high-contrast aesthetics</p>
+              <p className="text-xs text-ob-dim">
+                Choose from {THEMES.length} palettes, every one checked for contrast
+              </p>
             </div>
           </div>
           <button

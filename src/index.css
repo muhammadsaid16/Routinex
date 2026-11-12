@@ -91,26 +91,27 @@ body {
 
 /* 3. Missed (Past scheduled but not done) */
 .sys-cell[data-state="missed"] {
-  border: 1.5px solid #3d3c36;
-  background-color: #151614;
+  border: 1.5px solid var(--ob-line-strong);
+  background-color: var(--ob-cell-miss);
 }
 
 /* 4. Future (Upcoming scheduled) */
 .sys-cell[data-state="future"] {
-  background-color: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: var(--ob-cell-future);
+  border: 1px solid var(--ob-line);
 }
 .sys-cell[data-state="future"]::after {
   content: '';
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background-color: #2b2b27;
+  background-color: var(--ob-dim);
+  opacity: 0.55;
 }
 
 /* 5. Unscheduled */
 .sys-cell[data-state="unscheduled"] {
   background-color: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.02);
-  opacity: 0.3;
+  border: 1px dashed var(--ob-line);
+  opacity: 0.35;
 }
