@@ -11,3 +11,10 @@ dist-ssr/
 .DS_Store
 .env.local
 .env.*.local
+
+# Android & Gradle Build Artifacts
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+

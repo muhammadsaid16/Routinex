@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2 } from 'lucide-react';
 import { sound } from '../audio';
 import { exportBackupJSON, importBackupJSON, getInitials } from '../storage';
 import { Habit, HabitEntry } from '../types';
@@ -37,6 +37,61 @@ export const AccountView: React.FC<AccountViewProps> = ({
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [editedName, setEditedName] = useState<string>(userName);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [installGuide, setInstallGuide] = useState<{ title: string; desc: string } | null>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPC = async () => {
+    sound.playClick();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      try {
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          setInstallGuide({
+            title: 'Installation Started!',
+            desc: 'Routinix is being added to your desktop and applications menu. You can launch it directly as a standalone app.',
+          });
+          setDeferredPrompt(null);
+        }
+      } catch {}
+    } else {
+      setInstallGuide({
+        title: 'Install on PC (Desktop App):',
+        desc: 'In Chrome, Edge, or Brave: Click the Install icon (🖥️ or ⊕) in the browser address bar at the top, or click Menu (⋮) → "Install Routinix" to run as an independent desktop window with offline storage.',
+      });
+    }
+  };
+
+  const handleInstallAndroidWeb = async () => {
+    sound.playClick();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      try {
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          setInstallGuide({
+            title: 'Added to Home Screen!',
+            desc: 'Routinix has been added to your phone home screen. Enjoy the fullscreen app experience!',
+          });
+          setDeferredPrompt(null);
+        }
+      } catch {}
+    } else {
+      setInstallGuide({
+        title: 'Install on Android via Browser:',
+        desc: 'Open this app in Chrome on your phone, tap the three dots (⋮) in the top-right corner, and select "Add to Home screen" or "Install app".',
+      });
+    }
+  };
 
   const handleSaveName = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -231,6 +286,99 @@ export const AccountView: React.FC<AccountViewProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* App Downloads & Installation for PC and Android */}
+        <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-ob-gold/15 flex items-center justify-center text-ob-gold shrink-0">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-ob-text">Install & Download Routinix</div>
+                <div className="text-xs text-ob-dim mt-0.5">
+                  Standalone apps for PC & Android with offline Dexie.js database persistence.
+                </div>
+              </div>
+            </div>
+            <span className="self-start sm:self-auto text-[10px] font-mono uppercase tracking-wider font-semibold px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              Desktop & Android Ready
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Download / Install for PC */}
+            <div className="rounded-xl border border-ob-line bg-ob-s1 p-4 flex flex-col justify-between space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-lg bg-ob-raised border border-ob-line text-ob-gold shrink-0">
+                  <Monitor className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-ob-text">Desktop Application (PC)</div>
+                  <div className="text-[11px] text-ob-dim mt-0.5 leading-relaxed">
+                    Install on Windows, macOS, or Linux. Runs in a dedicated native window without browser frames.
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  onClick={handleInstallPC}
+                  className="w-full py-2.5 px-3.5 rounded-lg bg-ob-raised hover:bg-ob-gold hover:text-ob-on-gold border border-ob-line-strong text-xs font-bold text-ob-text transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Install for PC (Desktop App)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Download for Android */}
+            <div className="rounded-xl border border-ob-line bg-ob-s1 p-4 flex flex-col justify-between space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-lg bg-ob-raised border border-ob-line text-emerald-400 shrink-0">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-ob-text">Android App (APK & Web App)</div>
+                  <div className="text-[11px] text-ob-dim mt-0.5 leading-relaxed">
+                    Download the standalone Android APK or install directly to home screen via Chrome / Samsung Internet.
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href="/downloads/routinix.apk"
+                  download="routinix.apk"
+                  className="flex-1 py-2.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98] text-center"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download APK</span>
+                </a>
+                <button
+                  onClick={handleInstallAndroidWeb}
+                  className="py-2.5 px-3.5 rounded-lg bg-ob-raised border border-ob-line hover:border-ob-gold text-xs font-semibold text-ob-text hover:text-ob-gold transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98]"
+                  title="Install via Chrome or Samsung Internet"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-ob-gold" />
+                  <span>PWA</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {installGuide && (
+            <div className="p-3.5 rounded-xl bg-ob-raised border border-ob-line text-xs space-y-1.5 animate-in fade-in duration-150">
+              <div className="font-bold text-ob-gold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{installGuide.title}</span>
+              </div>
+              <p className="text-[11px] text-ob-text-2 leading-relaxed">
+                {installGuide.desc}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Audio Tactile Feedback */}
