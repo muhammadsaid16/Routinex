@@ -17,7 +17,8 @@ const DEVICE_ID_KEY = 'routinix_device_id';
 const SESSION_KEY = 'routinix_sync_session';
 const BROKER_KEY = 'routinix_sync_broker';
 const MAX_TOMBSTONES = 800;
-const PING_INTERVAL_MS = 25000;
+const PING_INTERVAL_MS = 15000;
+const PONG_TIMEOUT_MS = 45000;
 const CONNECT_TIMEOUT_MS = 8000;
 const MAX_RECONNECT_ATTEMPTS = 60;
 const GUEST_DIAL_DELAY_MS = 6000;
@@ -235,6 +236,8 @@ class SyncManager {
   private useRandomGuestId = false;
   /** True while a call is being set up. No second call starts meanwhile. */
   private connecting = false;
+  /** Time of the last answer from the other device. */
+  private lastPongAt = 0;
   private suppressBroadcast = 0;
 
   private baseline: {
@@ -719,6 +722,18 @@ class SyncManager {
       this.handleDisconnect();
     });
 
+    conn.on('iceStateChanged', (state: string) => {
+      // The route to the other device is gone, for example after it changed
+      // the network. The link is rebuilt straight away. Only the channel that
+      // is in use may end the link, an old one may still report a failure.
+      // A closed channel is handled by its own close event. Only a failed
+      // route means that the other device is out of reach.
+      if (state !== 'failed') return;
+      if (this.authenticated && this.activeConn && this.activeConn !== conn) return;
+      console.warn(`Sync ice state changed to ${state}`);
+      this.handleDisconnect();
+    });
+
     conn.on('error', (err: any) => {
       console.error('Sync connection error:', err);
     });
@@ -821,6 +836,7 @@ class SyncManager {
       }
 
       case 'pong': {
+        this.lastPongAt = Date.now();
         this.emitState({ lastSyncAt: Date.now() });
         return;
       }
@@ -863,8 +879,26 @@ class SyncManager {
 
     void this.sendSnapshot();
 
+    this.lastPongAt = Date.now();
+
     if (this.pingTimer) clearInterval(this.pingTimer);
-    this.pingTimer = setInterval(() => this.send({ t: 'ping' }), PING_INTERVAL_MS);
+    this.pingTimer = setInterval(() => {
+      this.send({ t: 'ping' });
+      this.checkLink();
+    }, PING_INTERVAL_MS);
+  }
+
+  /**
+   * A device that leaves the network keeps a channel that no longer works.
+   * The other device stops answering, and the link is rebuilt.
+   */
+  private checkLink() {
+    if (!this.state.linked) return;
+    if (Date.now() - this.lastPongAt < PONG_TIMEOUT_MS) return;
+
+    console.warn('Sync link lost, the other device stopped answering.');
+    this.emitState({ error: 'The other device went out of reach. Trying to reconnect...' });
+    this.handleDisconnect();
   }
 
   private handleDisconnect() {
@@ -912,12 +946,17 @@ class SyncManager {
    * run yet. This starts the retry right away.
    */
   handleAppWake(): void {
-    if (!this.session || this.state.linked) return;
+    if (!this.session) return;
     if (this.state.phase === 'idle') return;
+
+    // A link that still answers is fine. A link that stopped answering is
+    // dead, even when the app did not notice it yet.
+    const linkAlive = this.state.linked && Date.now() - this.lastPongAt < PONG_TIMEOUT_MS;
+    if (linkAlive) return;
 
     // A call is already on its way. Starting another one would drop it.
     if (this.connecting) return;
-    if (this.peer && this.peer.open) return;
+    if (this.peer && this.peer.open && !this.state.linked) return;
 
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);

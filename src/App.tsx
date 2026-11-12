@@ -88,6 +88,10 @@ export const App: React.FC = () => {
   // Device sync: bring the pairing back after a page reload
   useEffect(() => {
     void syncManager.resumeSession();
+
+    if (import.meta.env.DEV) {
+      (window as any).__routinix = { sync: syncManager };
+    }
   }, []);
 
   // Device sync: the browser freezes timers in a background tab, so the link
