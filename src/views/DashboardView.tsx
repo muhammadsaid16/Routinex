@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Habit, HabitEntry } from '../types';
 import { Cell } from '../components/Cell';
 import { resolveCellState, getTodayString, formatDateToISO, getDayOfWeek } from '../storage';
-import { ChevronLeft, ChevronRight, Calendar, Flame, CheckCircle2, AlertOctagon, Plus, Minus, MessageSquare, Check, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flame, CheckCircle2, AlertOctagon, Plus, Minus, MessageSquare, Check, X, Shuffle } from 'lucide-react';
 import { sound } from '../audio';
+import { ConsistencyStats } from '../types';
+import { quoteSignalFrom, pickQuote, nextQuote, QuoteSignal } from '../quotes/quotes';
 
 interface DashboardViewProps {
   habits: Habit[];
@@ -11,6 +13,7 @@ interface DashboardViewProps {
   onToggleEntry: (habitId: string, date: string, customValue?: number) => void;
   onUpdateNote: (habitId: string, date: string, note: string) => void;
   consistencyPercentage: number;
+  consistencyStats: ConsistencyStats;
   selectedIndex: number;
   onSelectIndex: (index: number) => void;
 }
@@ -21,6 +24,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onToggleEntry,
   onUpdateNote,
   consistencyPercentage,
+  consistencyStats,
   selectedIndex,
   onSelectIndex,
 }) => {
@@ -28,9 +32,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [editingNoteHabitId, setEditingNoteHabitId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState<string>('');
   const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(false);
+  const [quoteOffset, setQuoteOffset] = useState(0);
 
   const todayStr = getTodayString();
   const isToday = selectedDate === todayStr;
+
+  const quoteSignal: QuoteSignal = useMemo(
+    () =>
+      quoteSignalFrom(
+        habits,
+        entries,
+        consistencyStats,
+        todayStr
+      ),
+    [habits, entries, consistencyStats, todayStr]
+  );
+
+  const [quote, setQuote] = useState(() => pickQuote(quoteSignal));
+
+  useEffect(() => {
+    setQuote(pickQuote(quoteSignal));
+    setQuoteOffset(0);
+  }, [quoteSignal.group, quoteSignal.dayKey]);
 
   const handlePrevDay = () => {
     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -248,15 +271,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Philosophy Card */}
+        {/* Guiding Principle */}
         <div className="rounded-xl border border-ob-line bg-ob-s1 p-5 flex flex-col justify-between">
-          <div className="text-xs uppercase tracking-wider text-ob-dim font-medium flex items-center gap-1.5">
-            <Flame className="w-4 h-4 text-ob-gold" />
-            <span>Guiding Principle</span>
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-xs uppercase tracking-wider text-ob-dim font-medium flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-ob-gold" />
+              <span>Guiding Principle</span>
+            </div>
+            <button
+              onClick={() => {
+                sound.playClick();
+                setQuote(nextQuote(quoteSignal));
+                setQuoteOffset((value) => value + 1);
+              }}
+              title="Another line"
+              className="p-1.5 rounded-lg border border-ob-line bg-ob-raised text-ob-dim hover:text-ob-gold hover:border-ob-gold transition-colors shrink-0"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <p className="text-[13px] text-ob-text-2 italic leading-snug my-2">
-            “Missing twice isn't the problem. Letting it turn into a week is. Go tomorrow. No drama.”
-          </p>
+          <p className="text-[13px] text-ob-text-2 italic leading-snug my-2">“{quote.text}”</p>
           <div className="text-[11px] text-ob-muted font-mono uppercase">
             Ledger Accountability
           </div>

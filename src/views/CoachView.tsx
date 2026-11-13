@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Habit, HabitEntry, ConsistencyStats } from '../types';
-import { Bot, Send, Sparkles, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Bot, Send, Sparkles, MessageSquare, ShieldAlert, KeyRound, Eye, Loader2, AlertTriangle } from 'lucide-react';
 import { getTodayString, formatDateToISO, getDayOfWeek } from '../storage';
+import { MoneyAccount, MoneyBudget, MoneyTransaction } from '../money/types';
+import { CoachSettings, CoachContextLevel, loadCoachSettings, isCoachReady } from '../coach/settings';
+import { buildCoachContext } from '../coach/context';
+import { askCoach, CoachError } from '../coach/providers';
 
 interface CoachViewProps {
   habits: Habit[];
   entries: HabitEntry[];
   stats: ConsistencyStats;
+  userName?: string;
+  money?: { accounts: MoneyAccount[]; transactions: MoneyTransaction[]; budgets: MoneyBudget[] };
 }
 
 interface Message {
@@ -15,14 +21,27 @@ interface Message {
   time: string;
 }
 
-export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) => {
+const LEVELS: { id: CoachContextLevel; label: string; hint: string }[] = [
+  { id: 'summary', label: 'Summary', hint: 'Rates, streaks and the habit list only' },
+  { id: 'days', label: 'With money', hint: 'Adds the money month and the budgets' },
+  { id: 'full', label: 'Everything', hint: 'Adds the last fourteen days and your notes' },
+];
+
+export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, userName, money }) => {
   const [input, setInput] = useState('');
-  
+  const [settings] = useState<CoachSettings>(() => loadCoachSettings());
+  const [level, setLevel] = useState<CoachContextLevel>(settings.contextLevel || 'summary');
+  const [isThinking, setIsThinking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showContext, setShowContext] = useState(false);
+
+  const today = getTodayString();
+
   // Find habits with consecutive misses
-  const today = new Date();
+  const todayDate = new Date();
   const past3Days: string[] = [];
   for (let i = 1; i <= 3; i++) {
-    const d = new Date(today);
+    const d = new Date(todayDate);
     d.setDate(d.getDate() - i);
     past3Days.push(formatDateToISO(d));
   }
@@ -40,12 +59,12 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
     }
   });
 
-  const hasStats = stats.scheduled > 0 && stats.completed > 0 && stats.bestDay !== '—';
+  const hasStats = stats.scheduled > 0 && stats.completed > 0;
 
   const initialCoachMessage = consecutiveMisses.length > 0
     ? `I noticed you missed "${consecutiveMisses[0]}" on consecutive days. Missing twice isn't the problem; letting it turn into a week is. Show up tomorrow. No drama.`
     : hasStats
-    ? `Your 30-day consistency sits at ${stats.percentage}%. Your strongest day is ${stats.bestDay}, while ${stats.worstDay !== 'None' ? stats.worstDay : 'no day'} slips most often. Keep the momentum going.`
+    ? `Your 30-day consistency sits at ${stats.percentage}%. Your strongest day is ${stats.bestDay === '—' ? 'not clear yet' : stats.bestDay}, while ${stats.worstDay !== 'None' && stats.worstDay !== '—' ? stats.worstDay : 'no single day'} slips most often. Keep the momentum going.`
     : `Welcome to Ledger! Create your daily habits and start logging your progress. Consistency is built day by day, not in a single leap.`;
 
   const [messages, setMessages] = useState<Message[]>([
@@ -56,37 +75,89 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
     },
   ]);
 
-  const handleSend = (textToSend?: string) => {
-    const userText = textToSend || input;
-    if (!userText.trim()) return;
+  const context = useMemo(
+    () =>
+      buildCoachContext({
+        level,
+        userName,
+        habits,
+        entries,
+        stats,
+        money,
+        today,
+      }),
+    [level, userName, habits, entries, stats, money, today]
+  );
 
+  const coachReady = isCoachReady(settings);
+
+  /** The local answer, used when there is no key or the provider failed. */
+  const localReply = (userText: string): string => {
+    const lower = userText.toLowerCase();
+
+    if (lower.includes('why') || lower.includes('weekend') || lower.includes('worst')) {
+      if (stats.worstDay && stats.worstDay !== '—' && stats.worstDay !== 'None') {
+        return `On ${stats.worstDay}, you drop to your lowest execution rate. That is not a willpower issue; it is a lack of fixed routine. Anchor ${habits[0]?.title || 'your key habit'} to an immutable trigger, for example right after your morning coffee.`;
+      }
+      return `No single day slips yet, every day sits at about the same level. That usually means the system is too big rather than the day being weak. Cut one habit to two minutes for a week and watch the rate move.`;
+    }
+    if (lower.includes('streak') || lower.includes('miss')) {
+      return `Forget the streak number. Look at the 30-day consistency ratio of ${stats.percentage}%. A streak can break on a bad night, the rate does not. Put today's pending habits on the record before midnight.`;
+    }
+    if (lower.includes('tired') || lower.includes('motivation') || lower.includes('hard')) {
+      return `Action precedes motivation, never the other way. Lower the entry barrier: two minutes instead of sixty. Cross off the cell on the record and the mood follows the cell, not the other way round.`;
+    }
+    if (lower.includes('money') || lower.includes('spend') || lower.includes('budget')) {
+      return `Open the Money module and read the burn down before you spend. The number that decides is the one on the card, not the one in your head.`;
+    }
+    return `Understood. The priority today is keeping the record clean. Complete the pending habits for today before midnight. No drama, just execution.`;
+  };
+
+  const handleSend = async (textToSend?: string) => {
+    const userText = textToSend || input;
+    if (!userText.trim() || isThinking) return;
+
+    const question = userText.trim();
     const newMessages: Message[] = [
       ...messages,
-      { role: 'user', text: userText.trim(), time: 'Just now' },
+      { role: 'user', text: question, time: 'Just now' },
     ];
     setMessages(newMessages);
     setInput('');
+    setError(null);
 
-    // Generate pragmatic coach reply
-    setTimeout(() => {
-      let reply = '';
-      const lower = userText.toLowerCase();
+    if (!coachReady) {
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'coach', text: localReply(question), time: 'Just now' },
+        ]);
+      }, 350);
+      return;
+    }
 
-      if (lower.includes('why') || lower.includes('weekend') || lower.includes('worst')) {
-        reply = `On ${stats.worstDay}, you drop to your lowest execution rate. That is not a willpower issue; it is a lack of fixed routine. Anchor ${habits[0]?.title || 'your key habit'} to an immutable trigger (e.g. immediately after morning coffee).`;
-      } else if (lower.includes('streak') || lower.includes('miss')) {
-        reply = `Forget streak numbers. Streaks create fragile egos and demoralize you on day one after a slip. Look at your 30-day consistency ratio (${stats.percentage}%). Execute today to push it higher.`;
-      } else if (lower.includes('tired') || lower.includes('motivation') || lower.includes('hard')) {
-        reply = `Action precedes motivation, not the other way around. Reduce the entry barrier: do 2 minutes instead of 60. Cross off the cell on the record.`;
-      } else {
-        reply = `Understood. The priority today is keeping the record clean. Complete your pending habits for today before midnight. No drama, just execution.`;
-      }
-
+    setIsThinking(true);
+    try {
+      const reply = await askCoach(settings, context, messages, question);
       setMessages((prev) => [
         ...prev,
         { role: 'coach', text: reply, time: 'Just now' },
       ]);
-    }, 400);
+    } catch (err: any) {
+      const message =
+        err instanceof CoachError ? err.message : 'The coach could not answer right now.';
+      setError(message);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'coach',
+          text: `${message}\n\nMeanwhile, from your record: ${localReply(question)}`,
+          time: 'Just now',
+        },
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   const quickPrompts = [
@@ -111,6 +182,44 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
         <p className="text-xs text-ob-dim mt-1">
           Pragmatic, low-drama accountability grounded in your real habit history.
         </p>
+      </div>
+
+      {/* Provider state */}
+      <div
+        className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          coachReady
+            ? 'border-emerald-500/30 bg-emerald-500/10'
+            : 'border-ob-line bg-ob-s1'
+        }`}
+      >
+        <div className="flex items-start gap-3 min-w-0">
+          <KeyRound className={`w-4 h-4 shrink-0 mt-0.5 ${coachReady ? 'text-emerald-400' : 'text-ob-dim'}`} />
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-ob-text">
+              {coachReady ? 'Connected to your provider' : 'Running on the built in answers'}
+            </div>
+            <div className="text-[11px] text-ob-dim mt-0.5 leading-relaxed">
+              {coachReady
+                ? `Your key stays on this device. Only the record below is sent, only to ${settings.baseUrl || 'your provider'}.`
+                : 'Add your own key in Account and Preferences to let the coach read your record and answer in context.'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-ob-raised border border-ob-line shrink-0">
+          {LEVELS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setLevel(item.id)}
+              title={item.hint}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                level === item.id ? 'bg-ob-s1 text-ob-gold' : 'text-ob-dim hover:text-ob-text'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Principle Callout */}
@@ -139,7 +248,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
                 </div>
               )}
               <div
-                className={`max-w-[80%] rounded-xl px-4 py-3 text-[13px] leading-relaxed ${
+                className={`max-w-[80%] rounded-xl px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap ${
                   msg.role === 'user'
                     ? 'bg-ob-gold text-ob-on-gold font-medium'
                     : 'bg-ob-s1 border border-ob-line text-ob-text'
@@ -149,10 +258,28 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
               </div>
             </div>
           ))}
+
+          {isThinking && (
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-ob-gold/10 border border-ob-gold/30 flex items-center justify-center shrink-0">
+                <Loader2 className="w-4 h-4 text-ob-gold animate-spin" />
+              </div>
+              <div className="rounded-xl bg-ob-s1 border border-ob-line px-4 py-3 text-[13px] text-ob-dim">
+                Reading the record...
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input & Quick Prompts */}
         <div className="border-t border-ob-line bg-ob-s1/60 p-4 space-y-3">
+          {error && (
+            <div className="flex items-start gap-2 text-[11px] text-rose-400">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* Quick Prompts */}
           <div className="flex flex-wrap gap-2">
             {quickPrompts.map((prompt) => (
@@ -164,7 +291,20 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
                 {prompt}
               </button>
             ))}
+            <button
+              onClick={() => setShowContext((prev) => !prev)}
+              className="text-[11px] font-medium bg-ob-raised border border-ob-line text-ob-dim hover:text-ob-text hover:border-ob-gold px-2.5 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
+            >
+              <Eye className="w-3 h-3" />
+              {showContext ? 'Hide the record' : 'See what the coach reads'}
+            </button>
           </div>
+
+          {showContext && (
+            <pre className="max-h-40 overflow-auto rounded-lg bg-ob-canvas border border-ob-line p-3 text-[10px] font-mono text-ob-dim whitespace-pre-wrap">
+              {JSON.stringify(context, null, 2)}
+            </pre>
+          )}
 
           <form
             onSubmit={(e) => {
@@ -177,12 +317,13 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Ledger Coach about your habits..."
+              placeholder={coachReady ? 'Ask about anything in your life...' : 'Ask Ledger Coach about your habits...'}
               className="flex-1 bg-ob-s1 border border-ob-line rounded-lg px-3.5 py-2.5 text-xs text-ob-text outline-none focus:border-ob-gold focus:ring-1 focus:ring-ob-gold"
             />
             <button
               type="submit"
-              className="bg-ob-gold text-ob-on-gold p-2.5 rounded-lg hover:bg-ob-gold-bright transition-colors"
+              disabled={isThinking}
+              className="bg-ob-gold text-ob-on-gold p-2.5 rounded-lg hover:bg-ob-gold-bright transition-colors disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
             </button>

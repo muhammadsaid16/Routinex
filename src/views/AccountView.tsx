@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2, Trophy } from 'lucide-react';
+import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2, Trophy, KeyRound, Eye, EyeOff, Loader2, Bot } from 'lucide-react';
 import { sound } from '../audio';
 import { exportBackupJSON, importBackupJSON, getInitials } from '../storage';
 import { Habit, HabitEntry } from '../types';
 import { UIScaleOption, UI_SCALES } from '../uiScale';
+import {
+  CoachProvider,
+  CoachSettings,
+  PROVIDER_PRESETS,
+  loadCoachSettings,
+  saveCoachSettings,
+} from '../coach/settings';
 import { DeviceSyncPanel } from '../components/DeviceSyncPanel';
 
 interface AccountViewProps {
@@ -43,6 +50,10 @@ export const AccountView: React.FC<AccountViewProps> = ({
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [editedName, setEditedName] = useState<string>(userName);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [coach, setCoach] = useState<CoachSettings>(() => loadCoachSettings());
+  const [showCoachKey, setShowCoachKey] = useState(false);
+  const [coachTest, setCoachTest] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
+  const [coachTestNote, setCoachTestNote] = useState<string | null>(null);
   const [installGuide, setInstallGuide] = useState<{ title: string; desc: string } | null>(null);
 
   useEffect(() => {
@@ -388,6 +399,176 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
         {/* Device Sync & Link */}
         <DeviceSyncPanel />
+
+        {/* AI Coach */}
+        <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-ob-gold/15 flex items-center justify-center text-ob-gold shrink-0">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-ob-text">AI Coach</div>
+                <div className="text-xs text-ob-dim mt-0.5">
+                  Bring your own key. The coach reads your record and answers in context. The key
+                  stays on this device.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wider font-semibold text-ob-dim">
+                Provider
+              </label>
+              <select
+                value={coach.provider}
+                onChange={(e) => {
+                  const provider = e.target.value as CoachProvider;
+                  const preset = PROVIDER_PRESETS[provider];
+                  setCoach({
+                    ...coach,
+                    provider,
+                    baseUrl: preset.defaultBaseUrl,
+                    model: preset.defaultModel,
+                  });
+                  setCoachTest('idle');
+                  setCoachTestNote(null);
+                }}
+                className="w-full bg-ob-s1 border border-ob-line px-3 py-2 text-xs text-ob-text rounded-lg outline-none focus:border-ob-gold"
+              >
+                {Object.entries(PROVIDER_PRESETS).map(([id, preset]) => (
+                  <option key={id} value={id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-wider font-semibold text-ob-dim">
+                Model
+              </label>
+              <input
+                value={coach.model}
+                onChange={(e) => {
+                  setCoach({ ...coach, model: e.target.value });
+                  setCoachTest('idle');
+                }}
+                placeholder={PROVIDER_PRESETS[coach.provider].defaultModel}
+                spellCheck={false}
+                className="w-full bg-ob-s1 border border-ob-line px-3 py-2 text-xs font-mono text-ob-text rounded-lg outline-none focus:border-ob-gold placeholder:text-ob-muted"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="text-[10px] uppercase tracking-wider font-semibold text-ob-dim">
+                Base URL
+              </label>
+              <input
+                value={coach.baseUrl}
+                onChange={(e) => {
+                  setCoach({ ...coach, baseUrl: e.target.value });
+                  setCoachTest('idle');
+                }}
+                spellCheck={false}
+                className="w-full bg-ob-s1 border border-ob-line px-3 py-2 text-xs font-mono text-ob-text rounded-lg outline-none focus:border-ob-gold placeholder:text-ob-muted"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="text-[10px] uppercase tracking-wider font-semibold text-ob-dim">
+                API key {PROVIDER_PRESETS[coach.provider].needsKey ? '' : '(optional for a local model)'}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type={showCoachKey ? 'text' : 'password'}
+                  value={coach.apiKey}
+                  onChange={(e) => {
+                    setCoach({ ...coach, apiKey: e.target.value });
+                    setCoachTest('idle');
+                  }}
+                  placeholder="sk-..."
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="flex-1 bg-ob-s1 border border-ob-line px-3 py-2 text-xs font-mono text-ob-text rounded-lg outline-none focus:border-ob-gold placeholder:text-ob-muted"
+                />
+                <button
+                  onClick={() => setShowCoachKey((prev) => !prev)}
+                  className="p-2 rounded-lg border border-ob-line bg-ob-s1 text-ob-dim hover:text-ob-text transition-colors shrink-0"
+                  title={showCoachKey ? 'Hide the key' : 'Show the key'}
+                >
+                  {showCoachKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => {
+                sound.playClick();
+                saveCoachSettings(coach);
+                setCoachTest('idle');
+                setCoachTestNote('Saved. The coach uses this provider from now on.');
+              }}
+              className="px-3.5 py-2 rounded-lg bg-ob-gold text-ob-on-gold text-xs font-bold hover:bg-ob-gold-bright transition-colors"
+            >
+              Save
+            </button>
+
+            <button
+              onClick={async () => {
+                sound.playClick();
+                saveCoachSettings(coach);
+                setCoachTest('testing');
+                setCoachTestNote(null);
+                try {
+                  const { askCoach } = await import('../coach/providers');
+                  const { buildCoachContext } = await import('../coach/context');
+                  const context = buildCoachContext({
+                    level: 'summary',
+                    habits: [],
+                    entries: [],
+                    stats: { completed: 0, scheduled: 0, percentage: 0, currentStreak: 0, bestDay: '—', worstDay: '—' },
+                    today: new Date().toISOString().slice(0, 10),
+                  });
+                  const reply = await askCoach(coach, context, [], 'Reply with the single word: ready');
+                  setCoachTest('ok');
+                  setCoachTestNote(`The provider answered: ${reply.slice(0, 80)}`);
+                } catch (err: any) {
+                  setCoachTest('error');
+                  setCoachTestNote(err?.message || 'The provider did not answer.');
+                }
+              }}
+              disabled={coachTest === 'testing'}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-ob-line bg-ob-s1 text-xs font-semibold text-ob-dim hover:text-ob-text hover:border-ob-gold transition-colors disabled:opacity-50"
+            >
+              {coachTest === 'testing' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <KeyRound className="w-3.5 h-3.5" />
+              )}
+              Test the connection
+            </button>
+
+            {coachTestNote && (
+              <span
+                className={`text-[11px] ${
+                  coachTest === 'error' ? 'text-rose-400' : 'text-ob-dim'
+                }`}
+              >
+                {coachTestNote}
+              </span>
+            )}
+          </div>
+
+          <p className="text-[11px] text-ob-muted leading-relaxed">
+            The key is kept in this browser only. When you ask a question, the coach sends the
+            selected part of your record to the provider you chose. Nothing is stored on our side.
+          </p>
+        </div>
 
         {/* Milestones switch */}
         <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 flex items-center justify-between gap-4">

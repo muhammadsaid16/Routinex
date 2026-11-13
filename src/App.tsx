@@ -375,6 +375,7 @@ export const App: React.FC = () => {
             onToggleEntry={handleToggleEntry}
             onUpdateNote={handleUpdateNote}
             consistencyPercentage={stats.percentage}
+            consistencyStats={stats}
             selectedIndex={selectedHabitIndex}
             onSelectIndex={setSelectedHabitIndex}
           />
@@ -456,7 +457,13 @@ export const App: React.FC = () => {
         )}
 
         {currentTab === 'coach' && (
-          <CoachView habits={habits} entries={entries} stats={stats} />
+          <CoachView
+            habits={habits}
+            entries={entries}
+            stats={stats}
+            userName={userName}
+            money={money}
+          />
         )}
 
         {currentTab === 'account' && (
