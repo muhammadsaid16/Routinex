@@ -396,7 +396,7 @@ class SyncManager {
       phase: 'hosting',
       role: 'host',
       code,
-      error: null,
+      error: isRetry ? this.state.error : null,
       peerName: null,
       linked: false,
     });
@@ -409,8 +409,9 @@ class SyncManager {
     peer.on('open', () => {
       if (this.peer !== peer) return;
       this.connecting = false;
+      this.retryCount = 0;
       if (this.state.phase === 'hosting') {
-        this.emitState({ phase: 'hosting' });
+        this.emitState({ phase: 'hosting', error: null });
       }
 
       // After a reload the other device may be asleep with its timer frozen.
@@ -428,7 +429,7 @@ class SyncManager {
 
     peer.on('disconnected', () => {
       if (this.peer !== peer) return;
-      this.emitState({ error: 'The signalling server dropped the link. Trying to reconnect...' });
+      this.emitState({ error: 'The signalling server dropped the link. Reconnecting...' });
       this.scheduleReconnect();
     });
 
@@ -459,7 +460,7 @@ class SyncManager {
       phase: 'connecting',
       role: 'guest',
       code,
-      error: null,
+      error: isRetry ? this.state.error : null,
       peerName: null,
       linked: false,
     });
@@ -475,13 +476,15 @@ class SyncManager {
     peer.on('open', () => {
       if (this.peer !== peer) return;
       this.connecting = false;
+      this.retryCount = 0;
+      this.emitState({ error: null });
       const conn = peer.connect(peerId, { reliable: true, serialization: 'json' });
       this.attachConnection(conn, 'outgoing');
     });
 
     peer.on('disconnected', () => {
       if (this.peer !== peer) return;
-      this.emitState({ error: 'The signalling server dropped the link. Trying to reconnect...' });
+      this.emitState({ error: 'The signalling server dropped the link. Reconnecting...' });
       this.scheduleReconnect();
     });
 
@@ -622,7 +625,9 @@ class SyncManager {
       return;
     }
 
-    const delay = Math.min(5000, 600 * Math.pow(1.4, this.retryCount));
+    // Use exponential backoff (2.5s, 3.75s, 5.6s, up to 25s) to avoid hammering
+    // the broker and triggering Cloudflare rate limits (HTTP 429).
+    const delay = Math.min(25000, Math.round(2500 * Math.pow(1.5, Math.min(this.retryCount, 7))));
     this.retryCount++;
 
     this.retryTimer = setTimeout(() => {
@@ -1090,7 +1095,7 @@ class SyncManager {
       // because the two devices can call each other.
       if (this.state.role === 'guest') this.useRandomGuestId = true;
     } else if (type === 'network' || type === 'socket-error' || type === 'server-error') {
-      message = 'Could not reach the signalling server. Check the connection.';
+      message = 'Could not reach the signalling server (it may be rate-limited or busy). Reconnecting...';
     } else if (type === 'browser-not-supported') {
       message = 'This browser cannot open a peer to peer link.';
     }
@@ -1110,7 +1115,7 @@ class SyncManager {
 
     // A broker error during a restore attempt is not fatal. The retry loop
     // keeps trying until the other device is back.
-    if (this.session && (type === 'peer-unavailable' || type === 'unavailable-id' || type === 'network' || type === 'socket-error')) {
+    if (this.session && (type === 'peer-unavailable' || type === 'unavailable-id' || type === 'network' || type === 'socket-error' || type === 'server-error')) {
       this.emitState({ error: message });
       this.scheduleReconnect();
       return;
