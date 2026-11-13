@@ -90,7 +90,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
           <div className="text-xs text-ob-dim">
             {stats.bestDay && stats.bestDay !== '—'
               ? 'Your highest consistency rate of the week.'
-              : 'Log completions to reveal your peak day.'}
+              : 'Not enough on the record to name a peak day yet.'}
           </div>
         </div>
 
@@ -103,7 +103,9 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
           <div className="text-xs text-ob-dim">
             {stats.worstDay && stats.worstDay !== '—' && stats.worstDay !== 'None'
               ? 'Spot the day that slips and prepare safeguards.'
-              : 'No vulnerability detected yet.'}
+              : stats.worstDay === 'None'
+              ? 'No single day stands out, several sit at the same level.'
+              : 'Log more completions to find the day that slips.'}
           </div>
         </div>
       </div>
@@ -212,6 +214,8 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
               <div
                 key={item.dow}
                 className={`rounded-lg border p-3 flex flex-col justify-between transition-colors ${
+                  item.dow === 7 ? 'col-span-2 sm:col-span-1' : ''
+                } ${
                   isWorst
                     ? 'border-ob-danger/40 bg-ob-danger/5'
                     : isBest

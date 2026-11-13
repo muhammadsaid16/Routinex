@@ -2,6 +2,15 @@ import { Habit, HabitEntry, CellState, ConsistencyStats } from './types';
 import { db, requestPersistentStorage } from './db';
 import { syncManager } from './sync/syncManager';
 
+/**
+ * The day of the week analysis only names a day when the record can carry it:
+ * at least this many completions, at least this many chances for that weekday,
+ * and a gap between the best and the worst day that is wider than noise.
+ */
+const DAY_ANALYSIS_MIN_COMPLETIONS = 5;
+const DAY_ANALYSIS_MIN_SCHEDULED = 3;
+const DAY_ANALYSIS_MIN_GAP = 0.1;
+
 const HABITS_KEY = 'routinix_habits_v1';
 const ENTRIES_KEY = 'routinix_entries_v1';
 const LEGACY_HABITS_KEY = 'apex_habits_v1';
@@ -392,27 +401,32 @@ export function calculateStats(
   let bestDay = '—';
   let worstDay = '—';
 
-  if (completed > 0) {
-    let bestRate = -1;
-    let worstRate = 2;
+  // A day is only named when the record can carry the claim. Without enough
+  // volume, or when every day sits at the same level, the "worst day" is
+  // noise and not a pattern.
+  if (completed >= DAY_ANALYSIS_MIN_COMPLETIONS) {
+    const rates: { name: string; rate: number }[] = [];
 
     for (let d = 1; d <= 7; d++) {
       const stat = dayOfWeekStats[d];
-      if (stat.scheduled > 0) {
-        const rate = stat.completed / stat.scheduled;
-        if (rate > bestRate) {
-          bestRate = rate;
-          bestDay = dayNames[d];
-        }
-        if (rate < worstRate) {
-          worstRate = rate;
-          worstDay = dayNames[d];
-        }
-      }
+      if (stat.scheduled < DAY_ANALYSIS_MIN_SCHEDULED) continue;
+      rates.push({ name: dayNames[d], rate: stat.completed / stat.scheduled });
     }
 
-    if (worstRate === bestRate || worstRate === 1) {
-      worstDay = 'None';
+    if (rates.length > 0) {
+      const best = rates.reduce((a, b) => (b.rate > a.rate ? b : a));
+      const lowest = rates.reduce((a, b) => (b.rate < a.rate ? b : a));
+      const tiedLowest = rates.filter((r) => Math.abs(r.rate - lowest.rate) < 0.0001).length;
+
+      if (best.rate - lowest.rate >= DAY_ANALYSIS_MIN_GAP) {
+        bestDay = best.name;
+        // One slipping day only counts when it is the only one at that level.
+        worstDay = tiedLowest > 1 ? 'None' : lowest.name;
+      } else {
+        // Every day sits at about the same level, so no day stands out.
+        bestDay = '—';
+        worstDay = 'None';
+      }
     }
   }
 
