@@ -16,9 +16,11 @@ import {
 import { syncManager } from '../sync/syncManager';
 import { SyncState } from '../sync/types';
 import {
+  BrokerConfig,
   describeBroker,
   loadBroker,
   parseBrokerAddress,
+  resetBroker,
   saveBroker,
 } from '../sync/syncManager';
 import { formatPairingCode, normalizePairingCode, buildPairingUrl } from '../sync/code';
@@ -50,6 +52,7 @@ export const DeviceSyncPanel: React.FC = () => {
   const [busy, setBusy] = useState<boolean>(false);
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
   const [isBrokerOpen, setIsBrokerOpen] = useState<boolean>(false);
+  const [broker, setBroker] = useState<BrokerConfig>(() => loadBroker());
   const [brokerInput, setBrokerInput] = useState<string>(describeBroker(loadBroker()));
   const [brokerNote, setBrokerNote] = useState<string | null>(null);
 
@@ -116,15 +119,37 @@ export const DeviceSyncPanel: React.FC = () => {
     void syncManager.joinWithCode(normalized);
   }, []);
 
-  const handleSaveBroker = () => {
-    const broker = parseBrokerAddress(brokerInput);
-    if (!broker) {
+  const handleSaveBroker = async () => {
+    const parsed = parseBrokerAddress(brokerInput);
+    if (!parsed) {
       setBrokerNote('That address does not look right. Try https://host or http://host:9000');
       return;
     }
-    saveBroker(broker);
-    setBrokerInput(describeBroker(broker));
+    saveBroker(parsed);
+    setBroker(parsed);
+    setBrokerInput(describeBroker(parsed));
+    sound.playClick();
+
+    // A pairing that is already running must use the new server right away.
+    if (syncManager.getSessionCode()) {
+      try {
+        await syncManager.restartSession();
+        setBrokerNote('Saved. The pairing was restarted with the new server.');
+      } catch (err: any) {
+        console.error(err);
+        setBrokerNote('Saved. The pairing could not be restarted, stop it and pair again.');
+      }
+      return;
+    }
+
     setBrokerNote('Saved. Start a new pairing to use it.');
+  };
+
+  const handleResetBroker = () => {
+    const next = resetBroker();
+    setBroker(next);
+    setBrokerInput(describeBroker(next));
+    setBrokerNote('Back to the public server. Start a new pairing to use it.');
     sound.playClick();
   };
 
@@ -156,6 +181,10 @@ export const DeviceSyncPanel: React.FC = () => {
       : state.phase === 'error'
       ? 'bg-red-500/15 text-red-400 border-red-500/30'
       : 'bg-ob-gold/10 text-ob-gold border-ob-gold/30';
+
+  // A page on https cannot call a plain http broker. The browser blocks it.
+  const pageIsSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const brokerIsBlocked = pageIsSecure && !broker.secure;
 
   return (
     <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 space-y-4 shadow-sm">
@@ -376,14 +405,21 @@ export const DeviceSyncPanel: React.FC = () => {
           className="text-[11px] text-ob-dim hover:text-ob-gold transition-colors flex items-center gap-1.5"
         >
           <Globe className="w-3.5 h-3.5" />
-          <span>Signalling server: {describeBroker(loadBroker())}</span>
+          <span>Signalling server: {describeBroker(broker)}</span>
         </button>
 
         {isBrokerOpen && (
           <div className="mt-2 space-y-2">
             <p className="text-[11px] text-ob-muted leading-relaxed">
-              The public broker limits how many devices can pair from one address. Point both
-              devices at your own broker when that happens.
+              The public broker limits how many devices can pair from one address and answers with
+              HTTP 429 when a network asks too often. Point both devices at your own broker when
+              that happens.
+            </p>
+            <p className="text-[11px] text-ob-muted leading-relaxed">
+              Run <span className="font-mono text-ob-text">npm run signal</span> on the computer that
+              runs the app, then enter{' '}
+              <span className="font-mono text-ob-text">{'http://<computer-ip>:9000'}</span> on both
+              devices.
             </p>
             <div className="flex gap-2">
               <input
@@ -401,9 +437,21 @@ export const DeviceSyncPanel: React.FC = () => {
                 Save
               </button>
             </div>
+            {brokerIsBlocked && (
+              <p className="text-[11px] text-red-400 leading-relaxed">
+                This page is https, so the browser blocks a plain http server. Use an https address
+                for the broker, or open the app over http.
+              </p>
+            )}
             {brokerNote && (
               <p className="text-[11px] text-ob-gold">{brokerNote}</p>
             )}
+            <button
+              onClick={handleResetBroker}
+              className="text-[11px] text-ob-dim hover:text-ob-gold transition-colors"
+            >
+              Use the public server
+            </button>
           </div>
         )}
       </div>

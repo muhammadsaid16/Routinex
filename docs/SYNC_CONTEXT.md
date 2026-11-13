@@ -194,9 +194,17 @@ down its own connection in a loop and the link never comes back.
 few seconds, give it up, register under a different id and try again. A
 stale channel that the broker still holds cannot survive a new id.
 
-**The backoff** is short at first and then settles: `min(5 s, 0.6 s * 1.4^n)`.
-Reset the counter after every successful handshake, so the next failure is
-fast again.
+**The backoff has two policies.** A link that dropped while it worked comes
+back fast: `min(25 s, 2.5 s * 1.5^n)`. A broker that refused the connection is
+rate limiting the network, so the app asks much later: `min(10 min, 15 s *
+2^n)`. Reset the counter after every successful handshake, so the next failure
+is fast again.
+
+**The error text must name the real cause.** A peer library reports a lost
+broker socket as a network error and then as a disconnect. The generic text
+must not overwrite the specific one, or the user reads "the server dropped the
+link" while the server never answered at all. Keep the first cause and only
+use the generic text when there is none.
 
 ---
 
@@ -289,14 +297,21 @@ Each of these happened in the real app. Each one is a trap.
 
 ## 9. The broker
 
-A PeerJS compatible broker is the least work. Two traps:
+A PeerJS compatible broker is the least work. Three traps:
 
 - The bundled broker package is from 2015 and reads `socket.upgradeReq`, which
   the modern websocket library removed. Either pin the library to a version
   that still has it, or patch the event that carries the request.
 - The public broker limits how many devices may pair from one address. Make
   the broker address a setting the user can change, and ship a broker that
-  runs anywhere.
+  runs anywhere. A limit shows up as `HTTP 429`, and the app must say so
+  instead of retrying in a loop that makes the limit worse.
+- The ready message must arrive exactly once. The bundled broker sends it to
+  a new peer, but not to a peer that takes its id back, which is what a page
+  reload does. Sending it a second time makes the device open the link twice.
+  The second channel replaces the first one, the app throws the first one
+  away and the link never settles. Watch what the socket already received and
+  send the ready message only when it is missing.
 
 The broker only ever sees: peer ids, SDP, ICE candidates and the ciphertext.
 
@@ -361,5 +376,7 @@ and assert that the data actually moved.
 - [ ] Only what the app showed can be deleted
 - [ ] A save never clears the table
 - [ ] The broker address is a setting
+- [ ] A blocked broker says what is wrong and waits long enough
+- [ ] The broker sends the ready message only once
 - [ ] The camera path explains the secure address rule
 - [ ] The whole matrix above is verified in a real browser

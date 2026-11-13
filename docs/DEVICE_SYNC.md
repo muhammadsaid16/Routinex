@@ -60,8 +60,9 @@ used instead:
 npm run signal          # listens on http://localhost:9000
 ```
 
-Point the app at it from **Device Sync & Link → Signalling server**, or with the
-environment variables before a build:
+The broker prints the addresses that a phone on the same network can use, for
+example `http://192.168.1.37:9000`. Point the app at it from **Device Sync &
+Link → Signalling server**, or with the environment variables before a build:
 
 ```bash
 VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_SECURE=false npm run build
@@ -73,9 +74,59 @@ VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_SECURE=false npm run buil
 | `VITE_PEER_PORT` | broker port | `443` |
 | `VITE_PEER_PATH` | broker path prefix | `/` |
 | `VITE_PEER_SECURE` | `false` for a plain http broker | `true` |
+| `VITE_PEER_DEBUG` | `3` prints the PeerJS log | `0` |
 
 A page on `https` cannot call a plain `http` broker. For the deployed app the
-broker therefore needs a certificate, for example through a tunnel.
+broker therefore needs a certificate, for example through a tunnel. The panel
+warns about this when the page is on `https` and the broker is not.
+
+## When the broker refuses the network
+
+The public broker sits behind Cloudflare. A network that asks too often gets
+`HTTP 429` with the Cloudflare error `1015`, and the message in the panel is:
+
+> The signalling server did not answer. It may be rate limiting this network
+> (HTTP 429). Wait a few minutes, or point the app at a private broker.
+
+The app waits longer after every attempt when the broker is blocked. The first
+retry waits 15 seconds, then 30, 60, 120 and so on, up to 10 minutes. A link
+that was working and only dropped waits much less: 2.5 seconds, then 3.75, then
+5.6, up to 25 seconds.
+
+Three ways to get a link again:
+
+1. Wait for the limit to end. The panel shows the time to wait.
+2. Change the address of the network. A mobile hotspot gives the device a new
+   address, and the broker accepts it again.
+3. Run the private broker on the computer and point both devices at it.
+
+## The private broker on the same network
+
+```bash
+npm run signal
+```
+
+The broker prints the address for the local network, for example
+`http://192.168.1.37:9000`. On the computer and on the phone open **Device Sync
+& Link → Signalling server**, type that address and press **Save**. The pairing
+restarts at once with the new broker. **Use the public server** goes back to
+`0.peerjs.com`.
+
+Both devices must be on the same network, and the firewall of the computer must
+allow the port.
+
+## Tests
+
+```bash
+npm test
+```
+
+The tests cover the retry policy, the broker handshake, the case where a page
+takes its peer id back after a reload, and the rule that the broker sends the
+ready message only once. The manual end to end check lives in
+`tests/.pairing-check.mjs`. It drives two browsers, pairs them through the
+local broker and checks that a habit travels to the other device.
+
 
 ## What travels over the link
 
@@ -125,6 +176,7 @@ not the code.
 | `src/sync/cipher.ts` | message encryption and the pairing proof |
 | `src/sync/code.ts` | pairing codes and peer id derivation |
 | `src/sync/syncManager.ts` | peer link, snapshot, merge, tombstones, reconnect |
+| `src/sync/reconnect.ts` | the retry delays of the two kinds of failure |
 | `src/sync/types.ts` | message and record shapes |
 | `src/components/DeviceSyncPanel.tsx` | the panel in Account & Preferences |
 | `src/components/QrScanner.tsx` | camera scanner for the pairing code |
