@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "signal": "node server/signal.mjs"
+    "signal": "node server/signal.mjs",
+    "test": "node --test tests/"
   },
   "dependencies": {
     "clsx": "^2.1.1",
