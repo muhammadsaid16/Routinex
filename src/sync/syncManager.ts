@@ -2,6 +2,7 @@ import Peer, { DataConnection, PeerJSOption } from 'peerjs';
 import { db } from '../db';
 import { authProof, decryptPayload, deriveSyncKey, encryptPayload } from './cipher';
 import { deriveGuestPeerId, derivePeerId, generatePairingCode, normalizePairingCode } from './code';
+import { reconnectDelay } from './reconnect';
 import {
   SyncMessage,
   SyncState,
@@ -20,6 +21,7 @@ const MAX_TOMBSTONES = 800;
 const PING_INTERVAL_MS = 15000;
 const PONG_TIMEOUT_MS = 45000;
 const CONNECT_TIMEOUT_MS = 8000;
+const BROKER_TIMEOUT_MS = 10000;
 const MAX_RECONNECT_ATTEMPTS = 60;
 const GUEST_DIAL_DELAY_MS = 6000;
 
@@ -73,6 +75,16 @@ export function saveBroker(broker: BrokerConfig): void {
   }
 }
 
+/** Drops the saved broker address and goes back to the public broker. */
+export function resetBroker(): BrokerConfig {
+  try {
+    localStorage.removeItem(BROKER_KEY);
+  } catch {
+    /* storage blocked */
+  }
+  return defaultBroker();
+}
+
 /**
  * Turns a broker address such as https://broker.example.com or
  * http://192.168.1.10:9000 into the settings the peer client needs.
@@ -111,7 +123,7 @@ type SettingListener = (key: string, value: any) => void;
 function peerOptions(peerId: string): PeerJSOption {
   const env = (import.meta.env || {}) as Record<string, string | undefined>;
   const broker = loadBroker();
-  const options: PeerJSOption = { debug: 0 };
+  const options: PeerJSOption = { debug: env.VITE_PEER_DEBUG ? Number(env.VITE_PEER_DEBUG) : 0 };
 
   options.host = broker.host;
   options.port = broker.port;
@@ -276,6 +288,7 @@ class SyncManager {
   private deviceName = 'Device';
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private brokerTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private guestDialTimer: ReturnType<typeof setTimeout> | null = null;
   /** The call the host placed to the other device that has not answered yet. */
@@ -288,6 +301,12 @@ class SyncManager {
   /** Time of the last answer from the other device. */
   private lastPongAt = 0;
   private suppressBroadcast = 0;
+  /** True while the current attempt only restores an old pairing. */
+  private restoring = false;
+  /** True when the broker did not take the connection at all. */
+  private brokerBlocked = false;
+  /** True when the broker took this peer at least once. */
+  private peerHadOpened = false;
 
   private baseline: Record<SyncTable, Map<string, any>> = {
     habits: new Map(),
@@ -390,6 +409,8 @@ class SyncManager {
     this.key = deriveSyncKey(code);
 
     if (!isRetry) this.retryCount = 0;
+    this.restoring = isRetry;
+    this.peerHadOpened = false;
     this.saveSession({ role: 'host', code });
 
     this.emitState({
@@ -405,19 +426,30 @@ class SyncManager {
     this.connecting = true;
     this.peer = new Peer(peerId, peerOptions(peerId));
     const peer = this.peer;
+    let opened = false;
+    this.armBrokerTimeout(peer);
 
     peer.on('open', () => {
       if (this.peer !== peer) return;
+      // A broker that sends the ready message twice must not open the link
+      // twice. The second call would replace the first channel.
+      if (opened) return;
+      opened = true;
       this.connecting = false;
       this.retryCount = 0;
-      if (this.state.phase === 'hosting') {
+      this.brokerBlocked = false;
+      this.peerHadOpened = true;
+      this.clearBrokerTimeout();
+      if (this.state.linked) {
+        this.emitState({ error: null });
+      } else {
         this.emitState({ phase: 'hosting', error: null });
       }
 
       // After a reload the other device may be asleep with its timer frozen.
       // Calling it back restores the link without waiting for its timer. The
       // delay gives the other device time to call back on its own first.
-      if (isRetry && this.session?.role === 'host') {
+      if (this.restoring && this.session?.role === 'host') {
         this.scheduleGuestDial();
       }
     });
@@ -429,7 +461,11 @@ class SyncManager {
 
     peer.on('disconnected', () => {
       if (this.peer !== peer) return;
-      this.emitState({ error: 'The signalling server dropped the link. Reconnecting...' });
+      // PeerJS reports the reason first, as a network error, and this event
+      // after it. The generic text must not hide the reason that came first.
+      if (!this.state.error) {
+        this.emitState({ error: 'The signalling server dropped the link. Reconnecting...' });
+      }
       this.scheduleReconnect();
     });
 
@@ -454,6 +490,11 @@ class SyncManager {
 
     this.key = deriveSyncKey(code);
     if (!isRetry) this.retryCount = 0;
+    // A fresh pairing starts with the stable guest id again. The random id
+    // is only a fallback for one attempt.
+    if (!isRetry) this.useRandomGuestId = false;
+    this.restoring = isRetry;
+    this.peerHadOpened = false;
     this.saveSession({ role: 'guest', code });
 
     this.emitState({
@@ -472,19 +513,39 @@ class SyncManager {
     this.connecting = true;
     this.peer = new Peer(guestId, peerOptions(guestId));
     const peer = this.peer;
+    let opened = false;
+    this.armBrokerTimeout(peer);
 
     peer.on('open', () => {
       if (this.peer !== peer) return;
+      // A broker that sends the ready message twice must not dial the other
+      // device twice. The second call would replace the first channel.
+      if (opened) return;
+      opened = true;
       this.connecting = false;
       this.retryCount = 0;
-      this.emitState({ error: null });
+      this.brokerBlocked = false;
+      this.peerHadOpened = true;
+      this.clearBrokerTimeout();
+      if (this.state.linked) {
+        this.emitState({ error: null });
+      } else {
+        this.emitState({ phase: 'connecting', error: null });
+      }
       const conn = peer.connect(peerId, { reliable: true, serialization: 'json' });
       this.attachConnection(conn, 'outgoing');
+      // The broker answered. The other device now has a full window to
+      // answer the call.
+      this.armConnectTimeout();
     });
 
     peer.on('disconnected', () => {
       if (this.peer !== peer) return;
-      this.emitState({ error: 'The signalling server dropped the link. Reconnecting...' });
+      // PeerJS reports the reason first, as a network error, and this event
+      // after it. The generic text must not hide the reason that came first.
+      if (!this.state.error) {
+        this.emitState({ error: 'The signalling server dropped the link. Reconnecting...' });
+      }
       this.scheduleReconnect();
     });
 
@@ -493,8 +554,50 @@ class SyncManager {
       this.connecting = false;
       this.handlePeerError(err);
     });
+  }
+
+  /**
+   * Waits for the broker to make the peer ready.
+   *
+   * A broker that takes the socket but never sends the ready message leaves
+   * the peer waiting for ever. This is what happens when a device takes its
+   * id back too early, so the app must not wait in silence.
+   */
+  private armBrokerTimeout(peer: Peer) {
+    this.clearBrokerTimeout();
+
+    this.brokerTimer = setTimeout(() => {
+      this.brokerTimer = null;
+      if (this.peer !== peer || peer.open) return;
+
+      this.brokerBlocked = true;
+      this.emitState({
+        phase: 'error',
+        error:
+          'The signalling server did not make the device ready. It may be rate limiting this network (HTTP 429). Wait a few minutes, or point the app at a private broker.',
+      });
+      this.scheduleReconnect();
+    }, BROKER_TIMEOUT_MS);
+  }
+
+  private clearBrokerTimeout() {
+    if (this.brokerTimer) {
+      clearTimeout(this.brokerTimer);
+      this.brokerTimer = null;
+    }
+  }
+
+  /**
+   * Waits for the data channel and gives up when the other device stays away.
+   */
+  private armConnectTimeout() {
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
 
     this.connectTimer = setTimeout(() => {
+      this.connectTimer = null;
       if (!this.authenticated && this.state.phase === 'connecting') {
         // The call did not come through. A fresh peer id clears a stale
         // channel that the broker may still hold from the page before.
@@ -625,9 +728,10 @@ class SyncManager {
       return;
     }
 
-    // Use exponential backoff (2.5s, 3.75s, 5.6s, up to 25s) to avoid hammering
-    // the broker and triggering Cloudflare rate limits (HTTP 429).
-    const delay = Math.min(25000, Math.round(2500 * Math.pow(1.5, Math.min(this.retryCount, 7))));
+    // A link that dropped while it worked comes back fast. A broker that did
+    // not take the connection at all is rate limiting this network, so the
+    // app waits much longer instead of asking again every few seconds.
+    const delay = reconnectDelay(this.retryCount, this.brokerBlocked);
     this.retryCount++;
 
     this.retryTimer = setTimeout(() => {
@@ -639,6 +743,45 @@ class SyncManager {
   private async attemptReconnect() {
     const session = this.session;
     if (!session) return;
+
+    // The link came back while the retry was waiting. Nothing to do.
+    if (this.state.linked && this.peer?.open) {
+      this.retryCount = 0;
+      return;
+    }
+
+    const peer = this.peer;
+    if (peer && this.peerHadOpened && peer.disconnected && !peer.destroyed) {
+      // The broker connection dropped while the peer was registered. The same
+      // peer takes its id back with the same token, so no new peer is needed
+      // and the broker does not see an id that is taken.
+      try {
+        this.restoring = true;
+        this.connecting = true;
+        peer.reconnect();
+        return;
+      } catch {
+        /* the peer cannot be used again, a new one is built below */
+      }
+    }
+
+    if (session.role === 'host') {
+      await this.startHosting(session.code, true);
+    } else {
+      await this.joinWithCode(session.code, true);
+    }
+  }
+
+  /**
+   * Starts the stored pairing again. This is used after the signalling
+   * server address changed, so the new server is used right away.
+   */
+  async restartSession(): Promise<void> {
+    const session = this.session || this.loadSession();
+    if (!session) return;
+
+    this.retryCount = 0;
+    this.brokerBlocked = false;
 
     if (session.role === 'host') {
       await this.startHosting(session.code, true);
@@ -654,6 +797,10 @@ class SyncManager {
       this.retryTimer = null;
     }
     this.retryCount = 0;
+    this.brokerBlocked = false;
+    this.restoring = false;
+    this.peerHadOpened = false;
+    this.useRandomGuestId = false;
 
     await this.teardown();
     this.emitState({
@@ -1060,24 +1207,20 @@ class SyncManager {
     // A call is already on its way. Starting another one would drop it.
     if (this.connecting) return;
 
+    // A retry is already planned. It runs as soon as the browser gives the
+    // timer back, so the backoff is not reset by every focus event.
+    if (this.retryTimer) return;
+
     // The link stopped with a problem, so nothing is dialling any more. Without
     // this the device would sit on that screen until it is started by hand.
     if (this.state.phase === 'error') {
-      if (this.retryTimer) {
-        clearTimeout(this.retryTimer);
-        this.retryTimer = null;
-      }
-      this.retryCount = 0;
+      // A blocked broker keeps its backoff. The other failures start fast.
+      if (!this.brokerBlocked) this.retryCount = 0;
       void this.attemptReconnect();
       return;
     }
 
     if (this.peer && this.peer.open && !this.state.linked) return;
-
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
 
     this.retryCount = 0;
     void this.attemptReconnect();
@@ -1087,6 +1230,10 @@ class SyncManager {
     const type = err?.type || err?.message || 'unknown';
     let message = 'The device link failed.';
 
+    // The broker had already taken this peer when the link broke. The peer
+    // is still known, so the app may only have lost the socket.
+    const brokerWasReady = this.peer?.open === true;
+
     if (type === 'peer-unavailable') {
       message = 'No device is answering with that pairing code.';
     } else if (type === 'unavailable-id') {
@@ -1095,7 +1242,17 @@ class SyncManager {
       // because the two devices can call each other.
       if (this.state.role === 'guest') this.useRandomGuestId = true;
     } else if (type === 'network' || type === 'socket-error' || type === 'server-error') {
-      message = 'Could not reach the signalling server (it may be rate-limited or busy). Reconnecting...';
+      if (brokerWasReady) {
+        message = 'The signalling server dropped the link. Reconnecting...';
+        this.brokerBlocked = false;
+      } else {
+        // The broker did not take the connection. The public broker answers
+        // with HTTP 429 when a network asks too often, so the app waits
+        // longer and tells the user what to do.
+        message =
+          'The signalling server did not answer. It may be rate limiting this network (HTTP 429). Wait a few minutes, or point the app at a private broker.';
+        this.brokerBlocked = true;
+      }
     } else if (type === 'browser-not-supported') {
       message = 'This browser cannot open a peer to peer link.';
     }
@@ -1153,6 +1310,7 @@ class SyncManager {
       clearTimeout(this.connectTimer);
       this.connectTimer = null;
     }
+    this.clearBrokerTimeout();
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
