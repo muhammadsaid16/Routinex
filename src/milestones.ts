@@ -53,7 +53,7 @@ export const RANKS: RankLevel[] = [
   { level: 2, xp: 400, title: 'Disciplined Practitioner' },
   { level: 3, xp: 1000, title: 'Ironclad Executor' },
   { level: 4, xp: 2000, title: 'Stoic Sovereign' },
-  { level: 5, xp: 3600, title: 'Routinix Grandmaster' },
+  { level: 5, xp: 3600, title: 'Ledger Grandmaster' },
 ];
 
 const XP_PER_COMPLETION = 10;

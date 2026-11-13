@@ -1,8 +1,9 @@
-const CACHE_NAME = 'routinix-v2';
+const CACHE_NAME = 'routinix-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/logo.svg',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable.png'
@@ -48,6 +49,21 @@ self.addEventListener('fetch', (event) => {
         .catch(() =>
           caches.match('/index.html').then((cached) => cached || caches.match('/'))
         )
+    );
+    return;
+  }
+
+  // The manifest carries the installed name, so it must never come from an old
+  // cache. A new deploy reaches the install prompt without clearing storage.
+  if (request.url.includes('/manifest.json')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('/manifest.json', copy));
+          return response;
+        })
+        .catch(() => caches.match('/manifest.json'))
     );
     return;
   }
