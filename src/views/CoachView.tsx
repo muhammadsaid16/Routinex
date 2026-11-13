@@ -46,7 +46,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
     ? `I noticed you missed "${consecutiveMisses[0]}" on consecutive days. Missing twice isn't the problem; letting it turn into a week is. Show up tomorrow. No drama.`
     : hasStats
     ? `Your 30-day consistency sits at ${stats.percentage}%. Your strongest day is ${stats.bestDay}, while ${stats.worstDay !== 'None' ? stats.worstDay : 'no day'} slips most often. Keep the momentum going.`
-    : `Welcome to Routinix! Create your daily habits and start logging your progress. Consistency is built day by day, not in a single leap.`;
+    : `Welcome to Ledger! Create your daily habits and start logging your progress. Consistency is built day by day, not in a single leap.`;
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -106,7 +106,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
           <span>Context-Aware Mentor</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ob-text">
-          Routinix Coach
+          Ledger Coach
         </h1>
         <p className="text-xs text-ob-dim mt-1">
           Pragmatic, low-drama accountability grounded in your real habit history.
@@ -177,7 +177,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats }) 
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Routinix Coach about your habits..."
+              placeholder="Ask Ledger Coach about your habits..."
               className="flex-1 bg-ob-s1 border border-ob-line rounded-lg px-3.5 py-2.5 text-xs text-ob-text outline-none focus:border-ob-gold focus:ring-1 focus:ring-ob-gold"
             />
             <button

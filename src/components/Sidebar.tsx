@@ -4,6 +4,7 @@ import { getInitials } from '../storage';
 import { sound } from '../audio';
 import { THEMES } from '../themes';
 import { AppModule, MODULES, NavTab, navFor } from '../navigation';
+import { BrandMark } from './BrandMark';
 
 export type { NavTab };
 
@@ -40,11 +41,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div>
           {/* Logo */}
           <div className="flex items-center gap-2.5 px-3 py-2 cursor-pointer" onClick={() => onTabChange('dashboard')}>
-            <div className="w-6 h-6 rounded bg-ob-gold flex items-center justify-center font-black text-ob-on-gold text-xs tracking-tighter">
-              R
-            </div>
+            <BrandMark className="w-7 h-7" />
             <div className="font-bold tracking-widest text-sm text-ob-text uppercase">
-              Routinix
+              Ledger
             </div>
           </div>
 
@@ -145,10 +144,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Top Header */}
       <div className="sticky top-0 z-30 flex h-[56px] w-full items-center justify-between border-b border-ob-line bg-ob-sidebar px-4 lg:hidden">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => onTabChange('dashboard')}>
-          <div className="w-6 h-6 rounded bg-ob-gold flex items-center justify-center font-black text-ob-on-gold text-xs">
-            R
-          </div>
-          <span className="font-bold tracking-widest text-sm text-ob-text">ROUTINIX</span>
+          <BrandMark className="w-7 h-7" />
+          <span className="font-bold tracking-widest text-sm text-ob-text">LEDGER</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex gap-0.5 p-0.5 rounded-lg border border-ob-line bg-ob-s1">

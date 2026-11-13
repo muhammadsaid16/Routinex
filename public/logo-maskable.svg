@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="512" height="512"
+     viewBox="0 0 512 512">
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#303030"/>
+      <stop offset="1" stop-color="#101010"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Full bleed background, the launcher mask cuts the corners -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- The mark inside the safe zone -->
+  <g transform="translate(256 256) scale(0.78) translate(-596.5 -315.5)">
+    <path
+      d="M530 197 H655 C696.4 197 730 230.6 730 272 V364 H647 V306 C647 284.5 629.5 267 608 267 H530 Z"
+      fill="#8A8A8A"/>
+    <path
+      d="M530 197 L469 258 Q463 264 463 275 V357 C463 399.5 497.5 434 540 434 H650 Q662 434 671 425 L730 364 H568 C545.5 364 530 348.5 530 326 Z"
+      fill="#F7F6F4"/>
+  </g>
+</svg>

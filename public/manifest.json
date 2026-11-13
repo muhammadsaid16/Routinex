@@ -1,13 +1,15 @@
 {
-  "name": "Routinix - Habit Tracker",
-  "short_name": "Routinix",
-  "description": "High-performance offline habit tracker, consistency ratio and milestone system.",
+  "name": "Ledger - Life Console",
+  "short_name": "Ledger",
+  "description": "Offline first life console. Routines, money, goals and a coach that reads the record.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#070d19",
-  "theme_color": "#38bdf8",
+  "background_color": "#fffbeb",
+  "theme_color": "#fffbeb",
   "orientation": "portrait-primary",
-  "permissions": ["camera"],
+  "permissions": [
+    "camera"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

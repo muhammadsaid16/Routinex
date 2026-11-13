@@ -1,16 +1,16 @@
 {
-  "packageId": "app.routinex.twa",
+  "packageId": "app.ledger.twa",
   "host": "routinex-one.vercel.app",
-  "name": "Routinix - Habit Tracker",
-  "launcherName": "Routinix",
+  "name": "Ledger - Life Console",
+  "launcherName": "Ledger",
   "display": "standalone",
-  "themeColor": "#38BDF8",
-  "themeColorDark": "#000000",
-  "navigationColor": "#000000",
-  "navigationColorDark": "#000000",
+  "themeColor": "#FFFBEB",
+  "themeColorDark": "#FFFBEB",
+  "navigationColor": "#FFFBEB",
+  "navigationColorDark": "#FFFBEB",
   "navigationDividerColor": "#000000",
   "navigationDividerColorDark": "#000000",
-  "backgroundColor": "#070D19",
+  "backgroundColor": "#FFFBEB",
   "enableNotifications": true,
   "startUrl": "/",
   "iconUrl": "https://routinex-one.vercel.app/icon-512.png",
@@ -20,8 +20,8 @@
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1.0.2",
-  "appVersionCode": 3,
+  "appVersionName": "1.1.0",
+  "appVersionCode": 4,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://routinex-one.vercel.app/manifest.json",
@@ -47,5 +47,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1.0.2"
+  "appVersion": "1.1.0"
 }

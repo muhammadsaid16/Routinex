@@ -63,7 +63,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
         if (choice.outcome === 'accepted') {
           setInstallGuide({
             title: 'Installation Started!',
-            desc: 'Routinix is being added to your desktop and applications menu. You can launch it directly as a standalone app.',
+            desc: 'Ledger is being added to your desktop and applications menu. You can launch it directly as a standalone app.',
           });
           setDeferredPrompt(null);
         }
@@ -71,7 +71,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
     } else {
       setInstallGuide({
         title: 'Install on PC (Desktop App):',
-        desc: 'In Chrome, Edge, or Brave: Click the Install icon (🖥️ or ⊕) in the browser address bar at the top, or click Menu (⋮) → "Install Routinix" to run as an independent desktop window with offline storage.',
+        desc: 'In Chrome, Edge, or Brave: Click the Install icon (🖥️ or ⊕) in the browser address bar at the top, or click Menu (⋮) → "Install Ledger" to run as an independent desktop window with offline storage.',
       });
     }
   };
@@ -85,7 +85,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
         if (choice.outcome === 'accepted') {
           setInstallGuide({
             title: 'Added to Home Screen!',
-            desc: 'Routinix has been added to your phone home screen. Enjoy the fullscreen app experience!',
+            desc: 'Ledger has been added to your phone home screen. Enjoy the fullscreen app experience!',
           });
           setDeferredPrompt(null);
         }
@@ -124,7 +124,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `routinix_habits_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `ledger_habits_backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -226,7 +226,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ob-gold/10 border border-ob-gold/30 text-ob-gold text-[11px] font-semibold self-start sm:self-auto shrink-0">
             <Sparkles className="w-3 h-3" />
-            <span>ROUTINIX LIFETIME</span>
+            <span>LEDGER LIFETIME</span>
           </div>
         </div>
 
@@ -301,7 +301,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
                 <Download className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-sm font-bold text-ob-text">Install & Download Routinix</div>
+                <div className="text-sm font-bold text-ob-text">Install & Download Ledger</div>
                 <div className="text-xs text-ob-dim mt-0.5">
                   Standalone apps for PC & Android with offline Dexie.js database persistence.
                 </div>
@@ -354,8 +354,8 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
               <div className="flex items-center gap-2 pt-1">
                 <a
-                  href="/downloads/routinix.apk"
-                  download="routinix.apk"
+                  href="/downloads/ledger.apk"
+                  download="ledger.apk"
                   className="flex-1 py-2.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98] text-center"
                 >
                   <Download className="w-3.5 h-3.5" />

@@ -67,8 +67,8 @@ mangled.
 **Peer identifiers are derived from the code, never sent:**
 
 ```
-host peer id = "routinix-" + base32(SHA-256("peer|" + code))[0..16]
-guest peer id = "routinix-g" + base32(SHA-256("peer-guest|" + code))[0..16]
+host peer id = "ledger-" + base32(SHA-256("peer|" + code))[0..16]
+guest peer id = "ledger-g" + base32(SHA-256("peer-guest|" + code))[0..16]
 ```
 
 The broker therefore learns the peer ids but never the code, and the two

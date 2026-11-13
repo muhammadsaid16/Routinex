@@ -251,7 +251,7 @@ export const DeviceSyncPanel: React.FC = () => {
               bgColor="#ffffff"
               fgColor="#0b0a12"
               marginSize={1}
-              title="Routinix device pairing"
+              title="Ledger device pairing"
             />
           </div>
 

@@ -258,7 +258,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             “Missing twice isn't the problem. Letting it turn into a week is. Go tomorrow. No drama.”
           </p>
           <div className="text-[11px] text-ob-muted font-mono uppercase">
-            Routinix Accountability
+            Ledger Accountability
           </div>
         </div>
       </div>

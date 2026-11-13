@@ -1,6 +1,6 @@
 # Device Sync & Link
 
-Routinix syncs your habits between your PC and your phone the same way T3 Code
+Ledger syncs your life between your PC and your phone the same way T3 Code
 syncs a project between a laptop and a phone:
 
 - The data lives on the device first (Dexie / IndexedDB).
@@ -13,10 +13,10 @@ syncs a project between a laptop and a phone:
 1. Open **Account & Preferences** on the device that holds most of your data.
 2. In **Device Sync & Link** choose **This device hosts**.
 3. The screen shows a pairing code, for example `RXT-9F5Y-KKBQ-QA8P`, and a QR code.
-4. On the second device open Routinix and choose **Join with a code**.
+4. On the second device open Ledger and choose **Join with a code**.
 5. Type the code, or scan the QR code with the camera of the second device, or
    scan the QR code with the camera app of the phone. The camera app opens
-   Routinix with the code in the link, and the app pairs itself.
+   Ledger with the code in the link, and the app pairs itself.
 
 After the link is up, every change on either device shows up on the other one
 within a fraction of a second.
