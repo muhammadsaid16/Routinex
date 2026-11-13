@@ -3,7 +3,7 @@ import { Habit, HabitEntry, ConsistencyStats } from '../types';
 import { Bot, Send, Sparkles, MessageSquare, ShieldAlert, KeyRound, Eye, Loader2, AlertTriangle } from 'lucide-react';
 import { getTodayString, formatDateToISO, getDayOfWeek } from '../storage';
 import { MoneyAccount, MoneyBudget, MoneyTransaction } from '../money/types';
-import { CoachSettings, CoachContextLevel, loadCoachSettings, isCoachReady } from '../coach/settings';
+import { CoachContextLevel, isCoachReady, useCoachSettings } from '../coach/settings';
 import { buildCoachContext } from '../coach/context';
 import { askCoach, CoachError } from '../coach/providers';
 import { sound } from '../audio';
@@ -31,13 +31,12 @@ const LEVELS: { id: CoachContextLevel; label: string; hint: string }[] = [
 
 export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, userName, money }) => {
   const [input, setInput] = useState('');
-  const [settings] = useState<CoachSettings>(() => loadCoachSettings());
-  const [level, setLevel] = useState<CoachContextLevel>(settings.contextLevel || 'summary');
+  const [coachSettings, saveCoachSettings] = useCoachSettings();
+  const [level, setLevel] = useState<CoachContextLevel>(coachSettings.contextLevel || 'summary');
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [liveSettings, setLiveSettings] = useState<CoachSettings>(() => loadCoachSettings());
 
   const today = getTodayString();
 
@@ -93,7 +92,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
     [level, userName, habits, entries, stats, money, today]
   );
 
-  const coachReady = isCoachReady(liveSettings);
+  const coachReady = isCoachReady(coachSettings);
 
   /** The local answer, used when there is no key or the provider failed. */
   const localReply = (userText: string): string => {
@@ -142,7 +141,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
 
     setIsThinking(true);
     try {
-      const reply = await askCoach(liveSettings, context, messages, question);
+      const reply = await askCoach(coachSettings, context, messages, question);
       setMessages((prev) => [
         ...prev,
         { role: 'coach', text: reply, time: 'Just now' },
@@ -190,53 +189,53 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
 
       {/* Provider state */}
       <div
-        className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+        className={`rounded-xl border p-4 flex flex-col gap-3 ${
           coachReady
             ? 'border-emerald-500/30 bg-emerald-500/10'
             : 'border-ob-line bg-ob-s1'
         }`}
       >
-        <div className="flex items-start gap-3 min-w-0">
-          <KeyRound className={`w-4 h-4 shrink-0 mt-0.5 ${coachReady ? 'text-emerald-400' : 'text-ob-dim'}`} />
-          <div className="min-w-0">
-            <div className="text-xs font-semibold text-ob-text">
-              {coachReady ? 'Connected to your provider' : 'Running on the built in answers'}
-            </div>
-            <div className="text-[11px] text-ob-dim mt-0.5 leading-relaxed">
-              {coachReady
-                ? `Your key stays on this device. Only the record below is sent, only to ${liveSettings.baseUrl || 'your provider'}.`
-                : 'Add your own key in the settings to let the coach read your record and answer in context.'}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <KeyRound className={`w-4 h-4 shrink-0 mt-0.5 ${coachReady ? 'text-emerald-400' : 'text-ob-dim'}`} />
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-ob-text">
+                {coachReady ? 'Connected to your provider' : 'Running on the built in answers'}
+              </div>
+              <div className="text-[11px] text-ob-dim mt-0.5 leading-relaxed">
+                {coachReady
+                  ? `Your key stays on this device. Only the record below is sent, only to ${coachSettings.baseUrl || 'your provider'}.`
+                  : 'Add your own key in the settings to let the coach read your record and answer in context.'}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => {
               sound.playClick();
               setIsSettingsOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ob-line bg-ob-s1 text-[11px] font-semibold text-ob-dim hover:text-ob-gold hover:border-ob-gold transition-colors"
+            className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ob-line bg-ob-s1 text-[11px] font-semibold text-ob-dim hover:text-ob-gold hover:border-ob-gold transition-colors"
             title="Provider, key and model"
           >
             <KeyRound className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Settings</span>
           </button>
+        </div>
 
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-ob-raised border border-ob-line">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-ob-raised border border-ob-line overflow-x-auto">
           {LEVELS.map((item) => (
             <button
               key={item.id}
               onClick={() => setLevel(item.id)}
               title={item.hint}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+              className={`shrink-0 flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-colors ${
                 level === item.id ? 'bg-ob-s1 text-ob-gold' : 'text-ob-dim hover:text-ob-text'
               }`}
             >
               {item.label}
             </button>
           ))}
-          </div>
         </div>
       </div>
 
@@ -250,9 +249,9 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
       </div>
 
       {/* Chat Area */}
-      <div className="rounded-xl border border-ob-line bg-ob-sidebar h-[440px] flex flex-col justify-between overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-ob-line bg-ob-sidebar h-[60vh] min-h-[380px] sm:h-[520px] flex flex-col justify-between overflow-hidden shadow-sm">
         {/* Messages */}
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-y-auto">
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -336,7 +335,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={coachReady ? 'Ask about anything in your life...' : 'Ask Ledger Coach about your habits...'}
-              className="flex-1 bg-ob-s1 border border-ob-line rounded-lg px-3.5 py-2.5 text-xs text-ob-text outline-none focus:border-ob-gold focus:ring-1 focus:ring-ob-gold"
+              className="flex-1 min-w-0 bg-ob-s1 border border-ob-line rounded-lg px-3.5 py-2.5 text-base sm:text-xs text-ob-text outline-none focus:border-ob-gold focus:ring-1 focus:ring-ob-gold"
             />
             <button
               type="submit"
@@ -353,7 +352,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSaved={(next) => {
-          setLiveSettings(next);
+          saveCoachSettings(next);
           setLevel(next.contextLevel || 'summary');
         }}
       />
