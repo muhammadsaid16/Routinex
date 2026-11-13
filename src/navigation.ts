@@ -44,6 +44,7 @@ export const MONEY_NAV: NavItem[] = [
   { id: 'money', label: 'Money', icon: Wallet },
   { id: 'transactions', label: 'Transactions', icon: Receipt },
   { id: 'budgets', label: 'Budgets', icon: Repeat },
+  { id: 'coach', label: 'Coach', icon: Bot },
 ];
 
 export const MODULES: { id: AppModule; label: string; icon: React.ElementType }[] = [

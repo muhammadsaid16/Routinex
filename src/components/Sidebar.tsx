@@ -10,6 +10,7 @@ export type { NavTab };
 
 interface SidebarProps {
   currentTab: NavTab;
+  activeModule?: AppModule;
   onTabChange: (tab: NavTab) => void;
   onModuleChange: (module: AppModule) => void;
   consistencyPercentage: number;
@@ -20,6 +21,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
+  activeModule: controlledModule,
   onTabChange,
   onModuleChange,
   consistencyPercentage,
@@ -29,9 +31,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const initials = getInitials(userName);
   const activeModule: AppModule =
-    currentTab === 'money' || currentTab === 'transactions' || currentTab === 'budgets'
+    controlledModule ??
+    (currentTab === 'money' || currentTab === 'transactions' || currentTab === 'budgets'
       ? 'money'
-      : 'habits';
+      : 'habits');
   const navItems = navFor(activeModule, showMilestones);
 
   return (

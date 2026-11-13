@@ -97,7 +97,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       </div>
 
       {/* Filter */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      <div className="flex flex-wrap items-center gap-1.5">
         <div className="inline-flex items-center gap-1.5 text-xs text-ob-dim font-medium shrink-0">
           <Filter className="w-3.5 h-3.5" />
           Filter

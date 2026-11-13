@@ -42,6 +42,7 @@ import { MoneyAccount, MoneyBudget, MoneyTransaction } from './money/types';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
+  const [activeModule, setActiveModule] = useState<AppModule>('habits');
   const [data, setData] = useState<{ habits: Habit[]; entries: HabitEntry[] }>(getInitialData);
   const [userName, setUserName] = useState<string>(getSavedUserName);
   const [currentThemeId, setCurrentThemeId] = useState<string>(getSavedThemeId);
@@ -358,12 +359,23 @@ export const App: React.FC = () => {
       {/* Sidebar Navigation */}
       <Sidebar
         currentTab={currentTab}
-        onTabChange={setCurrentTab}
+        activeModule={activeModule}
+        onTabChange={(tab) => {
+          if (tab === 'money' || tab === 'transactions' || tab === 'budgets') {
+            setActiveModule('money');
+          } else if (tab === 'dashboard' || tab === 'habits' || tab === 'progress' || tab === 'milestones') {
+            setActiveModule('habits');
+          }
+          setCurrentTab(tab);
+        }}
         consistencyPercentage={stats.percentage}
         onOpenTheme={() => setIsThemeModalOpen(true)}
         userName={userName}
         showMilestones={milestonesEnabled}
-        onModuleChange={(module: AppModule) => setCurrentTab(module === 'money' ? 'money' : 'dashboard')}
+        onModuleChange={(module: AppModule) => {
+          setActiveModule(module);
+          setCurrentTab(module === 'money' ? 'money' : 'dashboard');
+        }}
       />
 
       {/* Main Content Area */}

@@ -48,7 +48,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <button
             onClick={() => setFilter('all')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${

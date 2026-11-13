@@ -1,4 +1,9 @@
-export type CoachProvider = 'anthropic' | 'openai' | 'openai-compatible';
+export type CoachProvider =
+  | 'anthropic'
+  | 'openai'
+  | 'openai-compatible'
+  | 'google'
+  | 'openrouter';
 export type CoachContextLevel = 'summary' | 'days' | 'full';
 
 export interface CoachSettings {
@@ -35,6 +40,18 @@ export const PROVIDER_PRESETS: Record<
     defaultBaseUrl: 'http://localhost:11434/v1',
     defaultModel: '',
     needsKey: false,
+  },
+  google: {
+    label: 'Google Gemini',
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    defaultModel: 'gemini-2.5-flash',
+    needsKey: true,
+  },
+  openrouter: {
+    label: 'OpenRouter',
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+    defaultModel: 'openrouter/auto',
+    needsKey: true,
   },
 };
 

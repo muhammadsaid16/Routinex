@@ -6,6 +6,8 @@ import { MoneyAccount, MoneyBudget, MoneyTransaction } from '../money/types';
 import { CoachSettings, CoachContextLevel, loadCoachSettings, isCoachReady } from '../coach/settings';
 import { buildCoachContext } from '../coach/context';
 import { askCoach, CoachError } from '../coach/providers';
+import { sound } from '../audio';
+import { CoachSettingsModal } from '../components/CoachSettingsModal';
 
 interface CoachViewProps {
   habits: Habit[];
@@ -34,6 +36,8 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [liveSettings, setLiveSettings] = useState<CoachSettings>(() => loadCoachSettings());
 
   const today = getTodayString();
 
@@ -89,7 +93,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
     [level, userName, habits, entries, stats, money, today]
   );
 
-  const coachReady = isCoachReady(settings);
+  const coachReady = isCoachReady(liveSettings);
 
   /** The local answer, used when there is no key or the provider failed. */
   const localReply = (userText: string): string => {
@@ -138,7 +142,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
 
     setIsThinking(true);
     try {
-      const reply = await askCoach(settings, context, messages, question);
+      const reply = await askCoach(liveSettings, context, messages, question);
       setMessages((prev) => [
         ...prev,
         { role: 'coach', text: reply, time: 'Just now' },
@@ -200,13 +204,26 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
             </div>
             <div className="text-[11px] text-ob-dim mt-0.5 leading-relaxed">
               {coachReady
-                ? `Your key stays on this device. Only the record below is sent, only to ${settings.baseUrl || 'your provider'}.`
-                : 'Add your own key in Account and Preferences to let the coach read your record and answer in context.'}
+                ? `Your key stays on this device. Only the record below is sent, only to ${liveSettings.baseUrl || 'your provider'}.`
+                : 'Add your own key in the settings to let the coach read your record and answer in context.'}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-ob-raised border border-ob-line shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              sound.playClick();
+              setIsSettingsOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-ob-line bg-ob-s1 text-[11px] font-semibold text-ob-dim hover:text-ob-gold hover:border-ob-gold transition-colors"
+            title="Provider, key and model"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
+
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-ob-raised border border-ob-line">
           {LEVELS.map((item) => (
             <button
               key={item.id}
@@ -219,6 +236,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
               {item.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -330,6 +348,15 @@ export const CoachView: React.FC<CoachViewProps> = ({ habits, entries, stats, us
           </form>
         </div>
       </div>
+
+      <CoachSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaved={(next) => {
+          setLiveSettings(next);
+          setLevel(next.contextLevel || 'summary');
+        }}
+      />
     </div>
   );
 };
