@@ -1,22 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  X,
-  Check,
-  Home,
-  UtensilsCrossed,
-  Car,
-  HeartPulse,
-  Dumbbell,
-  Repeat,
-  Gamepad2,
-  ShoppingBag,
-  GraduationCap,
-  Shapes,
-  TrendingUp,
-  Wallet,
-  CreditCard,
-  Banknote,
-} from 'lucide-react';
+import { X, Check, Wallet, CreditCard, Banknote, Shapes } from 'lucide-react';
 import {
   CATEGORY_BY_ID,
   MONEY_CATEGORIES,
@@ -26,20 +9,7 @@ import {
   inputToCents,
 } from '../money/types';
 import { Habit } from '../types';
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  Home,
-  UtensilsCrossed,
-  Car,
-  HeartPulse,
-  Dumbbell,
-  Repeat,
-  Gamepad2,
-  ShoppingBag,
-  GraduationCap,
-  Shapes,
-  TrendingUp,
-};
+import { CATEGORY_ICONS } from '../money/icons';
 
 const ACCOUNT_ICONS: Record<string, React.ElementType> = {
   cash: Banknote,

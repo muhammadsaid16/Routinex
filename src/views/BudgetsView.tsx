@@ -1,6 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { PiggyBank, Check } from 'lucide-react';
-import { MoneyBudget, MoneyTransaction, formatMoney, getCategory, getCurrency, MONEY_CATEGORIES } from '../money/types';
+import { CategoryIcon } from '../money/icons';
+import {
+  CURRENCIES,
+  MoneyBudget,
+  MoneyTransaction,
+  formatMoney,
+  getCategory,
+  getCurrency,
+  MONEY_CATEGORIES,
+} from '../money/types';
 import { calculateBudgetLines, getMonthString } from '../money/storage';
 import { sound } from '../audio';
 
@@ -113,11 +122,10 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
             <div key={category.id} className="rounded-2xl bg-ob-sidebar border border-ob-line p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[9px] font-bold uppercase shrink-0 ${category.color}`}
-                  >
-                    {category.label.slice(0, 2)}
-                  </div>
+                  <CategoryIcon
+                    category={category.id}
+                    className="w-4 h-4 text-ob-dim shrink-0"
+                  />
                   <span className="text-sm font-semibold text-ob-text truncate">{category.label}</span>
                 </div>
                 {hasLimit && (
@@ -144,7 +152,9 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
 
               <div className="flex items-center gap-2">
                 <div className="flex-1 flex items-center gap-2 rounded-lg bg-ob-s1 border border-ob-line px-3 py-2 focus-within:border-ob-gold">
-                  <span className="text-xs text-ob-dim">{currency === 'EUR' ? '€' : ''}</span>
+                  <span className="text-xs text-ob-dim">
+                    {CURRENCIES.find((c) => c.code === currency)?.symbol}
+                  </span>
                   <input
                     value={drafts[category.id] !== undefined ? drafts[category.id] : hasLimit ? String(limit) : ''}
                     onChange={(e) => setLimit(category.id, e.target.value)}

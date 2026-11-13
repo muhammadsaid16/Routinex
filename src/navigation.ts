@@ -30,7 +30,7 @@ export interface NavItem {
   icon: React.ElementType;
 }
 
-/** The habits module. The milestones tab is hidden when the system is off. */
+/** The routines module. The milestones tab is hidden when the system is off. */
 export const HABITS_NAV: NavItem[] = [
   { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
   { id: 'habits', label: 'Habits', icon: CheckSquare },
@@ -47,7 +47,7 @@ export const MONEY_NAV: NavItem[] = [
 ];
 
 export const MODULES: { id: AppModule; label: string; icon: React.ElementType }[] = [
-  { id: 'habits', label: 'Habits', icon: CheckSquare },
+  { id: 'habits', label: 'Routines', icon: CheckSquare },
   { id: 'money', label: 'Money', icon: Wallet },
 ];
 

@@ -10,6 +10,7 @@ import {
   MONEY_CATEGORIES,
 } from '../money/types';
 import { TransactionModal } from '../components/TransactionModal';
+import { CategoryIcon } from '../money/icons';
 import { Habit } from '../types';
 import { sound } from '../audio';
 
@@ -172,11 +173,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                       }}
                       className="w-full flex items-center gap-3 rounded-xl bg-ob-sidebar border border-ob-line px-4 py-3 text-left hover:border-ob-line-strong transition-colors"
                     >
-                      <div
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase shrink-0 ${category.color}`}
-                      >
-                        {category.label.slice(0, 2)}
-                      </div>
+                      <CategoryIcon
+                        category={transaction.category}
+                        className="w-4 h-4 text-ob-dim shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-ob-text truncate">
                           {transaction.note || category.label}

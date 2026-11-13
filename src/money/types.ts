@@ -42,24 +42,23 @@ export interface MoneyBudget {
 export interface MoneyCategory {
   id: string;
   label: string;
-  /** Tailwind classes for the icon chip. */
+  /** The name of the lucide icon that represents the category. */
   icon: string;
-  color: string;
   kind: 'expense' | 'income';
 }
 
 export const MONEY_CATEGORIES: MoneyCategory[] = [
-  { id: 'housing', label: 'Housing', icon: 'Home', color: 'text-sky-300 bg-sky-500/15', kind: 'expense' },
-  { id: 'food', label: 'Food', icon: 'UtensilsCrossed', color: 'text-orange-300 bg-orange-500/15', kind: 'expense' },
-  { id: 'transport', label: 'Transport', icon: 'Car', color: 'text-amber-300 bg-amber-500/15', kind: 'expense' },
-  { id: 'health', label: 'Health', icon: 'HeartPulse', color: 'text-rose-300 bg-rose-500/15', kind: 'expense' },
-  { id: 'fitness', label: 'Fitness', icon: 'Dumbbell', color: 'text-emerald-300 bg-emerald-500/15', kind: 'expense' },
-  { id: 'subscriptions', label: 'Subscriptions', icon: 'Repeat', color: 'text-violet-300 bg-violet-500/15', kind: 'expense' },
-  { id: 'leisure', label: 'Leisure', icon: 'Gamepad2', color: 'text-cyan-300 bg-cyan-500/15', kind: 'expense' },
-  { id: 'shopping', label: 'Shopping', icon: 'ShoppingBag', color: 'text-fuchsia-300 bg-fuchsia-500/15', kind: 'expense' },
-  { id: 'education', label: 'Education', icon: 'GraduationCap', color: 'text-blue-300 bg-blue-500/15', kind: 'expense' },
-  { id: 'other', label: 'Other', icon: 'Shapes', color: 'text-slate-300 bg-slate-500/15', kind: 'expense' },
-  { id: 'income', label: 'Income', icon: 'TrendingUp', color: 'text-emerald-300 bg-emerald-500/15', kind: 'income' },
+  { id: 'housing', label: 'Housing', icon: 'Home', kind: 'expense' },
+  { id: 'food', label: 'Food', icon: 'UtensilsCrossed', kind: 'expense' },
+  { id: 'transport', label: 'Transport', icon: 'Car', kind: 'expense' },
+  { id: 'health', label: 'Health', icon: 'HeartPulse', kind: 'expense' },
+  { id: 'fitness', label: 'Fitness', icon: 'Dumbbell', kind: 'expense' },
+  { id: 'subscriptions', label: 'Subscriptions', icon: 'Repeat', kind: 'expense' },
+  { id: 'leisure', label: 'Leisure', icon: 'Gamepad2', kind: 'expense' },
+  { id: 'shopping', label: 'Shopping', icon: 'ShoppingBag', kind: 'expense' },
+  { id: 'education', label: 'Education', icon: 'GraduationCap', kind: 'expense' },
+  { id: 'other', label: 'Other', icon: 'Shapes', kind: 'expense' },
+  { id: 'income', label: 'Income', icon: 'TrendingUp', kind: 'income' },
 ];
 
 export const CATEGORY_BY_ID: Record<string, MoneyCategory> = MONEY_CATEGORIES.reduce(
