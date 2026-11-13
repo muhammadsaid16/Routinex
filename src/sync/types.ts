@@ -68,5 +68,6 @@ export const SYNCED_SETTINGS = [
   'uiScale',
   'milestonesEnabled',
   'currency',
+  'coachSettings',
 ] as const;
 export type SyncedSettingKey = (typeof SYNCED_SETTINGS)[number];

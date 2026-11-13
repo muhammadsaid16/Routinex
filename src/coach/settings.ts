@@ -1,3 +1,7 @@
+import { useEffect, useState } from 'react';
+import { db } from '../db';
+import { syncManager } from '../sync/syncManager';
+
 export type CoachProvider =
   | 'anthropic'
   | 'openai'
@@ -82,6 +86,46 @@ export function saveCoachSettings(settings: CoachSettings) {
   } catch {
     /* storage blocked */
   }
+
+  notifyCoachSettings(settings);
+
+  // Device sync: the paired device uses the same provider and key.
+  void db.settings.put({ key: 'coachSettings', value: settings }).catch(() => {});
+  void syncManager.recordSetting('coachSettings', settings);
+}
+
+type CoachSettingsListener = (settings: CoachSettings) => void;
+const coachListeners = new Set<CoachSettingsListener>();
+
+function notifyCoachSettings(settings: CoachSettings) {
+  coachListeners.forEach((listener) => listener(settings));
+}
+
+/** Subscribes to every change, local or from the paired device. */
+export function subscribeCoachSettings(listener: CoachSettingsListener): () => void {
+  coachListeners.add(listener);
+  return () => coachListeners.delete(listener);
+}
+
+/** Reads the stored settings and keeps them current on both devices. */
+export function useCoachSettings(): [CoachSettings, (next: CoachSettings) => void] {
+  const [settings, setSettings] = useState<CoachSettings>(() => loadCoachSettings());
+
+  useEffect(() => subscribeCoachSettings(setSettings), []);
+
+  return [settings, saveCoachSettings];
+}
+
+/** True when a synced value has the shape of coach settings. */
+export function isCoachSettings(value: any): value is CoachSettings {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof value.provider === 'string' &&
+    typeof value.apiKey === 'string' &&
+    typeof value.model === 'string' &&
+    typeof value.baseUrl === 'string'
+  );
 }
 
 /** The coach only talks to a provider when the user gave it one. */

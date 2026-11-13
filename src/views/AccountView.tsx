@@ -4,7 +4,7 @@ import { sound } from '../audio';
 import { exportBackupJSON, importBackupJSON, getInitials } from '../storage';
 import { Habit, HabitEntry } from '../types';
 import { UIScaleOption, UI_SCALES } from '../uiScale';
-import { PROVIDER_PRESETS, loadCoachSettings, isCoachReady } from '../coach/settings';
+import { PROVIDER_PRESETS, isCoachReady, useCoachSettings } from '../coach/settings';
 import { CoachSettingsModal } from '../components/CoachSettingsModal';
 import { DeviceSyncPanel } from '../components/DeviceSyncPanel';
 
@@ -45,7 +45,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [editedName, setEditedName] = useState<string>(userName);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [coach, setCoach] = useState(() => loadCoachSettings());
+  const [coach, setCoach] = useCoachSettings();
   const [isCoachSettingsOpen, setIsCoachSettingsOpen] = useState(false);
   const coachReady = isCoachReady(coach);
   const coachProviderLabel = PROVIDER_PRESETS[coach.provider].label;

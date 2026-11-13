@@ -39,6 +39,7 @@ import {
   saveTransactions,
 } from './money/storage';
 import { MoneyAccount, MoneyBudget, MoneyTransaction } from './money/types';
+import { CoachSettings, isCoachSettings, saveCoachSettings } from './coach/settings';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
@@ -104,6 +105,8 @@ export const App: React.FC = () => {
       } else if (key === 'milestonesEnabled' && typeof value === 'boolean') {
         setMilestonesState(value);
         setMilestonesEnabled(value);
+      } else if (key === 'coachSettings' && isCoachSettings(value)) {
+        saveCoachSettings(value);
       }
     });
   }, []);
