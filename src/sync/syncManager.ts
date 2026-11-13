@@ -278,6 +278,8 @@ class SyncManager {
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private guestDialTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The call the host placed to the other device that has not answered yet. */
+  private pendingGuestConn: DataConnection | null = null;
   private retryCount = 0;
   private session: SyncSession | null = null;
   private useRandomGuestId = false;
@@ -415,14 +417,7 @@ class SyncManager {
       // Calling it back restores the link without waiting for its timer. The
       // delay gives the other device time to call back on its own first.
       if (isRetry && this.session?.role === 'host') {
-        this.guestDialTimer = setTimeout(() => {
-          if (this.peer !== peer || this.authenticated) return;
-          void deriveGuestPeerId(code).then((guestId) => {
-            if (this.peer !== peer || this.authenticated) return;
-            const conn = peer.connect(guestId, { reliable: true, serialization: 'json' });
-            this.attachConnection(conn, 'outgoing');
-          });
-        }, GUEST_DIAL_DELAY_MS);
+        this.scheduleGuestDial();
       }
     });
 
@@ -556,6 +551,57 @@ class SyncManager {
     this.session = null;
     try {
       localStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Calls the other device again from the host side.
+   *
+   * The host itself is fine while it waits: its id is on the broker and only
+   * the other device has not answered yet. So the call is placed again instead
+   * of rebuilding the link, which would drop this id from the broker for a
+   * moment and that is exactly when the other device gets no answer.
+   */
+  private scheduleGuestDial(delayMs: number = GUEST_DIAL_DELAY_MS) {
+    const peer = this.peer;
+    const code = this.session?.code;
+    if (!peer || !code) return;
+
+    if (this.guestDialTimer) {
+      clearTimeout(this.guestDialTimer);
+      this.guestDialTimer = null;
+    }
+
+    this.guestDialTimer = setTimeout(() => {
+      this.guestDialTimer = null;
+      if (this.peer !== peer || this.authenticated) return;
+
+      void deriveGuestPeerId(code).then((guestId) => {
+        if (this.peer !== peer || this.authenticated) return;
+
+        // The call that never got an answer is dropped before the next one,
+        // so the channels do not pile up while the other device is away.
+        this.dropPendingGuestConn();
+
+        const conn = peer.connect(guestId, { reliable: true, serialization: 'json' });
+        this.pendingGuestConn = conn;
+        this.attachConnection(conn, 'outgoing');
+      });
+    }, delayMs);
+  }
+
+  /** Drops the call to the other device without treating it as a lost link. */
+  private dropPendingGuestConn() {
+    const conn = this.pendingGuestConn;
+    this.pendingGuestConn = null;
+    if (!conn) return;
+
+    // Removed first, so its close event is not read as a lost link.
+    this.conns.delete(conn);
+    try {
+      conn.close();
     } catch {
       /* ignore */
     }
@@ -764,7 +810,10 @@ class SyncManager {
     conn.on('data', (data: any) => this.handleIncomingData(data, conn));
 
     conn.on('close', () => {
-      this.conns.delete(conn);
+      // A connection dropped from the set was closed on purpose by a teardown.
+      // It is already replaced by the pairing that starts now.
+      const wasTracked = this.conns.delete(conn);
+      if (!wasTracked) return;
       if (this.activeConn && this.activeConn !== conn) return;
       this.handleDisconnect();
     });
@@ -776,6 +825,7 @@ class SyncManager {
       // A closed channel is handled by its own close event. Only a failed
       // route means that the other device is out of reach.
       if (state !== 'failed') return;
+      if (!this.conns.has(conn)) return;
       if (this.authenticated && this.activeConn && this.activeConn !== conn) return;
       console.warn(`Sync ice state changed to ${state}`);
       this.handleDisconnect();
@@ -916,6 +966,7 @@ class SyncManager {
       }
     }
 
+    this.pendingGuestConn = null;
     this.retryCount = 0;
     this.emitState({
       phase: 'connected',
@@ -1003,6 +1054,19 @@ class SyncManager {
 
     // A call is already on its way. Starting another one would drop it.
     if (this.connecting) return;
+
+    // The link stopped with a problem, so nothing is dialling any more. Without
+    // this the device would sit on that screen until it is started by hand.
+    if (this.state.phase === 'error') {
+      if (this.retryTimer) {
+        clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+      }
+      this.retryCount = 0;
+      void this.attemptReconnect();
+      return;
+    }
+
     if (this.peer && this.peer.open && !this.state.linked) return;
 
     if (this.retryTimer) {
@@ -1033,6 +1097,17 @@ class SyncManager {
 
     console.error('Sync peer error:', err);
 
+    // A host only ever calls the other device, and "no answer" only means that
+    // the other device has not called back yet. The host itself is registered
+    // and healthy, so it keeps waiting and calls again. Rebuilding the link
+    // here would drop this id from the broker, and then the other device
+    // really would get no answer.
+    if (type === 'peer-unavailable' && this.state.role === 'host' && this.session) {
+      this.dropPendingGuestConn();
+      this.scheduleGuestDial(GUEST_DIAL_DELAY_MS);
+      return;
+    }
+
     // A broker error during a restore attempt is not fatal. The retry loop
     // keeps trying until the other device is back.
     if (this.session && (type === 'peer-unavailable' || type === 'unavailable-id' || type === 'network' || type === 'socket-error')) {
@@ -1045,17 +1120,23 @@ class SyncManager {
   }
 
   private closeConnection() {
-    for (const conn of Array.from(this.conns)) {
+    const conns = Array.from(this.conns);
+
+    // The state goes first. A connection closed on purpose fires "close"
+    // while it is still the active one, and that would be read as a lost link
+    // and arm a retry that tears down the pairing which is starting now.
+    this.conns.clear();
+    this.conn = null;
+    this.activeConn = null;
+    this.authenticated = false;
+
+    for (const conn of conns) {
       try {
         conn.close();
       } catch {
         /* ignore */
       }
     }
-    this.conns.clear();
-    this.conn = null;
-    this.activeConn = null;
-    this.authenticated = false;
   }
 
   private async teardown() {
@@ -1077,14 +1158,19 @@ class SyncManager {
     }
 
     this.closeConnection();
+    this.pendingGuestConn = null;
 
-    if (this.peer) {
+    // Detach first. destroy() emits "disconnected" while the peer is still
+    // alive, and the handlers would take that as a lost link and arm a retry
+    // which then tears down the peer this call is about to create.
+    const peer = this.peer;
+    this.peer = null;
+    if (peer) {
       try {
-        this.peer.destroy();
+        peer.destroy();
       } catch {
         /* ignore */
       }
-      this.peer = null;
     }
 
     this.authenticated = false;

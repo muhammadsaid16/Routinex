@@ -3,7 +3,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   Link2,
   Link2Off,
-  QrCode,
   RefreshCw,
   Smartphone,
   Monitor,
@@ -242,18 +241,27 @@ export const DeviceSyncPanel: React.FC = () => {
 
       {/* Hosting: show the pairing code and the QR code */}
       {state.code && !state.linked && (
-        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4 pt-1 items-start">
-          <div className="rounded-xl bg-white p-3 border border-ob-line mx-auto sm:mx-0">
-            <QRCodeSVG
-              value={pairingUrl}
-              size={168}
-              level="M"
-              bgColor="#ffffff"
-              fgColor="#0b0a12"
-              marginSize={1}
-              title="Ledger device pairing"
-            />
-          </div>
+        <div
+          className={`grid grid-cols-1 gap-4 pt-1 items-start ${
+            state.role === 'host' ? 'sm:grid-cols-[auto_1fr]' : ''
+          }`}
+        >
+          {/* Only the device that waits carries the code. A device that joins
+              shows a QR as well, and a second scan would make the scanner join
+              too, so there would be no host to answer. */}
+          {state.role === 'host' && (
+            <div className="rounded-xl bg-white p-3 border border-ob-line mx-auto sm:mx-0">
+              <QRCodeSVG
+                value={pairingUrl}
+                size={168}
+                level="M"
+                bgColor="#ffffff"
+                fgColor="#0b0a12"
+                marginSize={1}
+                title="Ledger device pairing"
+              />
+            </div>
+          )}
 
           <div className="space-y-3">
             <div>
@@ -273,8 +281,9 @@ export const DeviceSyncPanel: React.FC = () => {
                 </button>
               </div>
               <p className="text-[11px] text-ob-dim mt-2 leading-relaxed">
-                Scan the QR code with the other device, or type the code there. The link opens a
-                direct encrypted channel between the two devices.
+                {state.role === 'host'
+                  ? 'Scan the QR code with the other device, or type the code there. The link opens a direct encrypted channel between the two devices.'
+                  : 'This device joins with that code. Keep Ledger open on the other device until it answers.'}
               </p>
             </div>
 
@@ -347,17 +356,6 @@ export const DeviceSyncPanel: React.FC = () => {
               Unlink
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Guest mode: show the entered code while connecting */}
-      {state.phase === 'connecting' && !state.linked && state.role === 'guest' && (
-        <div className="flex items-center gap-2 text-xs text-ob-dim pt-1">
-          <QrCode className="w-4 h-4 text-ob-gold" />
-          <span>
-            Linking with <span className="font-mono text-ob-gold">{formatPairingCode(state.code || '')}</span>
-            ...
-          </span>
         </div>
       )}
 
