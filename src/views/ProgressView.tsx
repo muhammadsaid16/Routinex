@@ -11,8 +11,6 @@ interface ProgressViewProps {
   stats: ConsistencyStats;
   onToggleEntry: (habitId: string, date: string) => void;
   onNavigateToMilestones?: () => void;
-  myDeviceId?: string | null;
-  peerDeviceId?: string | null;
 }
 
 export const ProgressView: React.FC<ProgressViewProps> = ({
@@ -21,8 +19,6 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
   stats,
   onToggleEntry,
   onNavigateToMilestones,
-  myDeviceId = null,
-  peerDeviceId = null,
 }) => {
   const playerStats = calculatePlayerStats(habits, entries, stats);
   const todayStr = getTodayString();
@@ -181,7 +177,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({
               {/* Grid of micro-cells */}
               <div className="flex items-center gap-1">
                 {datesMatrix.map((dateStr) => {
-                  const state = resolveCellState(habit, dateStr, entries, todayStr, myDeviceId, peerDeviceId);
+                  const state = resolveCellState(habit, dateStr, entries, todayStr);
                   return (
                     <Cell
                       key={dateStr}

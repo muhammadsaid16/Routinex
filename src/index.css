@@ -89,18 +89,7 @@ body {
   transform: scale(1.05);
 }
 
-/* 3. Half (Shared habit, one device only) */
-.sys-cell[data-state="half"] {
-  border: 1.5px solid var(--ob-gold);
-  background: linear-gradient(to right, var(--ob-gold) 50%, transparent 50%);
-  color: var(--ob-on-gold);
-  cursor: pointer;
-}
-.sys-cell[data-state="half"]:hover {
-  transform: scale(1.05);
-}
-
-/* 4. Missed (Past scheduled but not done) */
+/* 3. Missed (Past scheduled but not done) */
 .sys-cell[data-state="missed"] {
   border: 1.5px solid var(--ob-line-strong);
   background-color: var(--ob-cell-miss);

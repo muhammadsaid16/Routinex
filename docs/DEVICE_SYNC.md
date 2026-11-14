@@ -168,23 +168,6 @@ The peer id that the devices register with the broker is
 `SHA-256('routinix.device-sync.peer|' + code)`. The broker sees the peer id but
 not the code.
 
-## Shared habits
-
-A habit can be shared with the paired device. Open **Habits → New Habit** or
-tap the **Users** icon on an existing habit.
-
-For a shared habit a day only counts when both devices complete it on that
-day. The panel shows:
-
-- **Half**: you did it, the other device has not done it yet
-- **Waiting for the other device** / **Done on the other device**
-- **Both done** when the day counts for the shared streak
-
-Each entry stores the device ids that completed the day (`completedBy`).
-When the link brings records together, the sets are merged, so a late
-record never removes the other device from the day. If the devices are not
-paired, your own completion counts as usual.
-
 ## Files
 
 | File | Purpose |

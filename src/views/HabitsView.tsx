@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Habit, DayOfWeek } from '../types';
-import { Plus, Trash2, Calendar, ShieldCheck, X, Target, Users } from 'lucide-react';
+import { Plus, Trash2, Calendar, ShieldCheck, X, Target } from 'lucide-react';
 import { sound } from '../audio';
 
 interface HabitsViewProps {
   habits: Habit[];
   onAddHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => void;
   onUpdateSchedule: (habitId: string, days: DayOfWeek[]) => void;
-  onUpdateShared: (habitId: string, shared: boolean) => void;
   onDeleteHabit: (habitId: string) => void;
 }
 
@@ -15,7 +14,6 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   habits,
   onAddHabit,
   onUpdateSchedule,
-  onUpdateShared,
   onDeleteHabit,
 }) => {
   const [isAdding, setIsAdding] = useState(false);
@@ -25,7 +23,6 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   const [isNumeric, setIsNumeric] = useState(false);
   const [targetValue, setTargetValue] = useState<number>(10);
   const [unit, setUnit] = useState<string>('pages');
-  const [isShared, setIsShared] = useState(false);
 
   const daysList: { id: DayOfWeek; label: string }[] = [
     { id: 1, label: 'Mon' },
@@ -57,14 +54,12 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
       scheduleDays: selectedDays,
       targetValue: isNumeric ? Number(targetValue) : undefined,
       unit: isNumeric ? unit.trim() || undefined : undefined,
-      shared: isShared || undefined,
     });
 
     setTitle('');
     setDescription('');
     setSelectedDays([1, 2, 3, 4, 5, 6, 7]);
     setIsNumeric(false);
-    setIsShared(false);
     setIsAdding(false);
   };
 
@@ -126,12 +121,6 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                     {habit.targetValue} {habit.unit}
                   </span>
                 )}
-                {habit.shared && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-ob-gold/10 border border-ob-gold/30 text-ob-gold font-semibold flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    Shared
-                  </span>
-                )}
               </div>
               {habit.description && (
                 <p className="text-xs text-ob-dim mt-0.5">{habit.description}</p>
@@ -169,22 +158,6 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                   );
                 })}
               </div>
-
-              {/* Shared Toggle */}
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  onUpdateShared(habit.id, !habit.shared);
-                }}
-                className={`p-2 rounded-lg transition-colors border ${
-                  habit.shared
-                    ? 'text-ob-gold bg-ob-gold/10 border-ob-gold/30'
-                    : 'text-ob-dim hover:text-ob-text hover:bg-ob-s1 border-transparent'
-                }`}
-                title={habit.shared ? 'Shared with the paired device. Click to make it personal.' : 'Make it a shared habit (counts only when both devices do it).'}
-              >
-                <Users className="w-4 h-4" />
-              </button>
 
               {/* Delete Button */}
               <button
@@ -287,25 +260,6 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Shared habit toggle */}
-              <div className="rounded-lg border border-ob-line bg-ob-s1 p-3 space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-ob-gold" />
-                    <span className="text-xs font-semibold text-ob-text">Shared with the paired device</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isShared}
-                    onChange={(e) => setIsShared(e.target.checked)}
-                    className="w-4 h-4 accent-ob-gold rounded cursor-pointer"
-                  />
-                </div>
-                <p className="text-[11px] text-ob-dim leading-relaxed">
-                  The day counts only when both devices complete it. Your shared streak grows when you both show up.
-                </p>
               </div>
 
               <div>

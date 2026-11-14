@@ -1,7 +1,6 @@
 import { Habit, HabitEntry, CellState, ConsistencyStats } from './types';
 import { db, requestPersistentStorage } from './db';
 import { syncManager } from './sync/syncManager';
-import { isSharedDayComplete, sharedDayState } from './shared';
 
 /**
  * The day of the week analysis only names a day when the record can carry it:
@@ -329,9 +328,7 @@ export function resolveCellState(
   habit: Habit,
   dateStr: string,
   entries: HabitEntry[],
-  todayStr: string,
-  myDeviceId?: string | null,
-  peerDeviceId?: string | null
+  todayStr: string
 ): CellState {
   const dow = getDayOfWeek(dateStr);
   const isScheduled = habit.scheduleDays.includes(dow);
@@ -342,18 +339,6 @@ export function resolveCellState(
 
   const entry = entries.find(e => e.habitId === habit.id && e.date === dateStr);
   const isDone = Boolean(entry?.completed);
-
-  // A shared habit is only done when both devices did it. A day that only
-  // one device did is shown as half, so the waiting side is visible.
-  if (habit.shared && entry) {
-    if (isSharedDayComplete(entry, myDeviceId ?? null, peerDeviceId ?? null)) {
-      return 'done';
-    }
-    const state = sharedDayState(entry, myDeviceId ?? null, peerDeviceId ?? null);
-    if (state === 'mine' || state === 'theirs') {
-      return 'half';
-    }
-  }
 
   if (isDone) {
     return 'done';
@@ -404,10 +389,7 @@ export function calculateStats(
       scheduled++;
       dayOfWeekStats[dow].scheduled++;
 
-      const entry = entries.find(e => e.habitId === habit.id && e.date === dateStr);
-      const isDone = habit.shared
-        ? isSharedDayComplete(entry, null, null)
-        : Boolean(entry?.completed);
+      const isDone = entries.some(e => e.habitId === habit.id && e.date === dateStr && e.completed);
       if (isDone) {
         completed++;
         dayOfWeekStats[dow].completed++;
@@ -458,10 +440,9 @@ export function calculateStats(
     const scheduledToday = habits.filter(h => !h.archived && h.scheduleDays.includes(dow));
     if (scheduledToday.length === 0) continue;
 
-    const completedToday = scheduledToday.filter(h => {
-      const entry = entries.find(e => e.habitId === h.id && e.date === dateStr);
-      return h.shared ? isSharedDayComplete(entry, null, null) : Boolean(entry?.completed);
-    });
+    const completedToday = scheduledToday.filter(h =>
+      entries.some(e => e.habitId === h.id && e.date === dateStr && e.completed)
+    );
 
     if (dateStr === todayStr) {
       if (completedToday.length > 0) {
