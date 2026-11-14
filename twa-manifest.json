@@ -4,13 +4,13 @@
   "name": "Ledger - Life Console",
   "launcherName": "Ledger",
   "display": "standalone",
-  "themeColor": "#FFFBEB",
-  "themeColorDark": "#FFFBEB",
-  "navigationColor": "#FFFBEB",
-  "navigationColorDark": "#FFFBEB",
+  "themeColor": "#000000",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
   "navigationDividerColor": "#000000",
   "navigationDividerColorDark": "#000000",
-  "backgroundColor": "#FFFBEB",
+  "backgroundColor": "#000000",
   "enableNotifications": true,
   "startUrl": "/",
   "iconUrl": "https://ledger-v7.vercel.app/icon-512.png",
@@ -20,8 +20,8 @@
     "path": "./android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1.1.1",
-  "appVersionCode": 5,
+  "appVersionName": "1.1.2",
+  "appVersionCode": 6,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://ledger-v7.vercel.app/manifest.json",
@@ -47,5 +47,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1.1.1"
+  "appVersion": "1.1.2"
 }

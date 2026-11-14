@@ -382,6 +382,17 @@ export const applyTheme = (themeId: string) => {
     db.settings.put({ key: 'activeThemeId', value: theme.id }).catch(() => {});
   } catch (e) {}
 
+  // Update status bar color for Android TWA and browsers in real time
+  const canvasBg = theme.variables['--ob-canvas'];
+  if (canvasBg && typeof document !== 'undefined') {
+    const metaThemeColors = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+    if (metaThemeColors.length > 0) {
+      metaThemeColors.forEach((meta) => {
+        meta.setAttribute('content', canvasBg);
+      });
+    }
+  }
+
   // Device sync: the paired device follows the same theme.
   void syncManager.recordSetting('activeThemeId', theme.id);
 };

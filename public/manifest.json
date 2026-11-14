@@ -4,8 +4,8 @@
   "description": "Offline first life console. Routines, money, goals and a coach that reads the record.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fffbeb",
-  "theme_color": "#fffbeb",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait-primary",
   "permissions": [
     "camera"
