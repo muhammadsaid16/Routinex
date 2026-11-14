@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette } from 'lucide-react';
+import { Settings, Palette, Link2 } from 'lucide-react';
 import { getInitials } from '../storage';
 import { sound } from '../audio';
 import { THEMES } from '../themes';
@@ -179,6 +179,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Switch Theme"
           >
             <Palette className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              sound.playClick();
+              onTabChange('account');
+            }}
+            className="p-1.5 rounded-lg border border-ob-line bg-ob-s1 text-ob-gold hover:bg-ob-raised transition-colors"
+            title="Device Sync & Link"
+          >
+            <Link2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => onTabChange('account')}

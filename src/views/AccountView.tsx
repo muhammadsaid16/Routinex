@@ -236,6 +236,9 @@ export const AccountView: React.FC<AccountViewProps> = ({
           </div>
         </div>
 
+        {/* Device Sync & Link */}
+        <DeviceSyncPanel />
+
         {/* Theme Settings Card */}
         <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -391,9 +394,6 @@ export const AccountView: React.FC<AccountViewProps> = ({
             </div>
           )}
         </div>
-
-        {/* Device Sync & Link */}
-        <DeviceSyncPanel />
 
         {/* AI Coach */}
         <div className="rounded-xl border border-ob-line bg-ob-sidebar p-5 flex items-center justify-between gap-4">

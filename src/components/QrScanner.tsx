@@ -32,7 +32,7 @@ export const QrScanner: React.FC<QrScannerProps> = ({ isOpen, onClose, onDetecte
       const media = navigator.mediaDevices;
       if (!media || !media.getUserMedia) {
         setError(
-          'This browser only opens the camera on a secure address. Use https://routinex-one.vercel.app or install the Android app.'
+          'This browser only opens the camera on a secure address. Use https://ledger-v7.vercel.app or install the Android app.'
         );
         return;
       }

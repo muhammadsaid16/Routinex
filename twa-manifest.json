@@ -1,6 +1,6 @@
 {
   "packageId": "app.ledger.twa",
-  "host": "routinex-one.vercel.app",
+  "host": "ledger-v7.vercel.app",
   "name": "Ledger - Life Console",
   "launcherName": "Ledger",
   "display": "standalone",
@@ -13,8 +13,8 @@
   "backgroundColor": "#FFFBEB",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://routinex-one.vercel.app/icon-512.png",
-  "maskableIconUrl": "https://routinex-one.vercel.app/icon-maskable.png",
+  "iconUrl": "https://ledger-v7.vercel.app/icon-512.png",
+  "maskableIconUrl": "https://ledger-v7.vercel.app/icon-maskable.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./android.keystore",
@@ -24,7 +24,7 @@
   "appVersionCode": 5,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://routinex-one.vercel.app/manifest.json",
+  "webManifestUrl": "https://ledger-v7.vercel.app/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
   "alphaDependencies": {
@@ -33,7 +33,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://routinex-one.vercel.app/",
+  "fullScopeUrl": "https://ledger-v7.vercel.app/",
   "minSdkVersion": 24,
   "orientation": "portrait-primary",
   "fingerprints": [
