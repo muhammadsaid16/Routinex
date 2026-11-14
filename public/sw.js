@@ -1,4 +1,4 @@
-const CACHE_NAME = 'routinix-v3';
+const CACHE_NAME = 'routinix-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
+
+  // APK downloads must never be cached by service worker
+  if (request.url.includes('/downloads/') || request.url.includes('.apk')) {
+    return;
+  }
 
   // The app shell is fetched from the network first, so a new deploy reaches
   // the phone without clearing the cache by hand.

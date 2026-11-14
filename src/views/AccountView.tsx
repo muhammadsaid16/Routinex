@@ -363,7 +363,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
               <div className="flex items-center gap-2 pt-1">
                 <a
-                  href="/downloads/ledger.apk"
+                  href="/downloads/ledger.apk?v=2"
                   download="ledger.apk"
                   className="flex-1 py-2.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98] text-center"
                 >
