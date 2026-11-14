@@ -27,9 +27,9 @@ export interface Tombstone extends SyncStamp {
 }
 
 export type SyncMessage =
-  | { t: 'challenge'; nonce: string }
-  | { t: 'auth'; proof: string }
-  | { t: 'welcome'; deviceName: string; proof: string }
+  | { t: 'challenge'; nonce: string; deviceId: string }
+  | { t: 'auth'; proof: string; deviceId: string }
+  | { t: 'welcome'; deviceName: string; proof: string; deviceId: string }
   | {
       t: 'snapshot';
       habits: SyncedHabit[];

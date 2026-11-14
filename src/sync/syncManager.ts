@@ -3,6 +3,7 @@ import { db } from '../db';
 import { authProof, decryptPayload, deriveSyncKey, encryptPayload } from './cipher';
 import { deriveGuestPeerId, derivePeerId, generatePairingCode, normalizePairingCode } from './code';
 import { reconnectDelay } from './reconnect';
+import { completedByList, mergeEntryCompletion } from '../shared';
 import {
   SyncMessage,
   SyncState,
@@ -245,6 +246,17 @@ function isRemoteNewer(remote: any, local: any): boolean {
   return (remote?.updatedBy ?? '') > (local.updatedBy ?? '');
 }
 
+/**
+ * True when the merged record knows a device that the local record did not.
+ *
+ * A shared habit counts a day only when both devices did it, so a record
+ * that arrives late still has to be kept when it brings a new device.
+ */
+function hasNewDevice(local: any, merged: any): boolean {
+  const known = new Set(completedByList(local));
+  return completedByList(merged).some((id) => !known.has(id));
+}
+
 function readDeviceId(): string {
   try {
     const stored = localStorage.getItem(DEVICE_ID_KEY);
@@ -307,6 +319,8 @@ class SyncManager {
   private brokerBlocked = false;
   /** True when the broker took this peer at least once. */
   private peerHadOpened = false;
+  /** The device id of the other side of the link. */
+  private peerDeviceId: string | null = null;
 
   private baseline: Record<SyncTable, Map<string, any>> = {
     habits: new Map(),
@@ -372,6 +386,11 @@ class SyncManager {
 
   getDeviceId(): string {
     return this.deviceId;
+  }
+
+  /** The device id of the other side of the link, or null when there is none. */
+  getPeerDeviceId(): string | null {
+    return this.peerDeviceId;
   }
 
   setDeviceName(name: string) {
@@ -955,7 +974,7 @@ class SyncManager {
       // waiting device is the one that was reloaded.
       if (direction === 'incoming') {
         this.nonce = this.makeNonce();
-        this.sendPlain({ t: 'challenge', nonce: this.nonce }, conn);
+        this.sendPlain({ t: 'challenge', nonce: this.nonce, deviceId: this.deviceId }, conn);
       }
     });
 
@@ -1025,7 +1044,13 @@ class SyncManager {
       case 'challenge': {
         if (!this.key) return;
         this.nonce = message.nonce;
-        this.sendPlain({ t: 'auth', proof: authProof(this.key, message.nonce) }, conn);
+        // The other device names itself, so a shared habit knows which device
+        // did a day.
+        this.peerDeviceId = message.deviceId || this.peerDeviceId;
+        this.sendPlain(
+          { t: 'auth', proof: authProof(this.key, message.nonce), deviceId: this.deviceId },
+          conn
+        );
         return;
       }
 
@@ -1037,12 +1062,14 @@ class SyncManager {
           this.closeConnection();
           return;
         }
+        this.peerDeviceId = message.deviceId || this.peerDeviceId;
         this.authenticated = true;
         this.sendPlain(
           {
             t: 'welcome',
             deviceName: this.deviceName,
             proof: expected,
+            deviceId: this.deviceId,
           },
           conn
         );
@@ -1058,6 +1085,7 @@ class SyncManager {
           this.closeConnection();
           return;
         }
+        this.peerDeviceId = message.deviceId || this.peerDeviceId;
         this.authenticated = true;
         this.emitState({ peerName: message.deviceName });
         this.onAuthenticated(conn);
@@ -1437,16 +1465,25 @@ class SyncManager {
     const key = keyFor(table, record);
     const local = this.baseline[table].get(key);
 
-    if (!isRemoteNewer(record, local)) return;
+    // A shared habit needs the set of devices that did the day. The set is
+    // the union of both sides, so a record that arrives late never throws
+    // away the completion of the other device.
+    let incoming = record;
+    if (table === 'entries' && local) {
+      incoming = mergeEntryCompletion(local as SyncedEntry, record as SyncedEntry);
+      if (!isRemoteNewer(record, local) && !hasNewDevice(local, incoming)) return;
+    } else if (!isRemoteNewer(record, local)) {
+      return;
+    }
 
     // A delete that is newer than this record wins. The record stays deleted.
     const tombstone = this.tombstones.get(`${table}:${key}`);
-    if (tombstone && (tombstone.updatedAt ?? 0) > (record.updatedAt ?? 0)) return;
+    if (tombstone && (tombstone.updatedAt ?? 0) > (incoming.updatedAt ?? 0)) return;
 
     this.suppressBroadcast++;
     try {
-      await TABLE_STORES[table].put([record]);
-      this.baseline[table].set(key, record);
+      await TABLE_STORES[table].put([incoming]);
+      this.baseline[table].set(key, incoming);
     } catch (err) {
       console.error('Sync remote write failed:', err);
     } finally {

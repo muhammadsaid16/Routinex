@@ -21,7 +21,7 @@ export const Cell: React.FC<CellProps> = ({
 
   return (
     <div
-      onClick={state === 'pending' || state === 'done' || state === 'missed' ? onClick : undefined}
+      onClick={state === 'pending' || state === 'done' || state === 'missed' || state === 'half' ? onClick : undefined}
       title={title}
       data-state={state}
       style={{

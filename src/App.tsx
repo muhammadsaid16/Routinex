@@ -30,6 +30,7 @@ import { THEMES, applyTheme, getSavedThemeId } from './themes';
 import { sound } from './audio';
 import { UIScaleOption, applyUIScale, getSavedUIScale, UI_SCALES } from './uiScale';
 import { syncManager } from './sync/syncManager';
+import { completedByList, withCompletedBy, withoutCompletedBy } from './shared';
 import { loadFromDexie } from './storage';
 import { getMilestonesEnabled, setMilestonesEnabled } from './milestones';
 import {
@@ -57,6 +58,14 @@ export const App: React.FC = () => {
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [selectedHabitIndex, setSelectedHabitIndex] = useState(0);
+  const [peerDeviceId, setPeerDeviceId] = useState<string | null>(syncManager.getPeerDeviceId());
+  const myDeviceId = syncManager.getDeviceId();
+
+  useEffect(() => {
+    return syncManager.subscribe(() => {
+      setPeerDeviceId(syncManager.getPeerDeviceId());
+    });
+  }, []);
 
   const { habits, entries } = data;
   const currentTheme = THEMES.find((t) => t.id === currentThemeId) || THEMES[0];
@@ -227,20 +236,45 @@ export const App: React.FC = () => {
       (e) => e.habitId === habitId && e.date === date
     );
 
+    const myDeviceId = syncManager.getDeviceId();
+    const isShared = Boolean(habit?.shared);
+    // A shared habit keeps the record of the other device, so the entry is
+    // never thrown away. It only loses this device.
+    const keepsTheOtherSide = isShared && existingIndex >= 0 && Array.isArray(entries[existingIndex].completedBy);
+
     let updatedEntries: HabitEntry[];
 
     if (existingIndex >= 0) {
       const current = entries[existingIndex];
       if (customValue !== undefined) {
         const isComplete = habit?.targetValue ? customValue >= habit.targetValue : customValue > 0;
+        const next: HabitEntry = {
+          ...current,
+          completed: isComplete,
+          currentValue: customValue,
+          completedAt: isComplete ? new Date().toISOString() : undefined,
+        };
         updatedEntries = [
           ...entries.slice(0, existingIndex),
-          {
-            ...current,
-            completed: isComplete,
-            currentValue: customValue,
-            completedAt: isComplete ? new Date().toISOString() : undefined,
-          },
+          isShared
+            ? isComplete
+              ? withCompletedBy(next, myDeviceId)
+              : withoutCompletedBy(next, myDeviceId)
+            : next,
+          ...entries.slice(existingIndex + 1),
+        ];
+      } else if (isShared && keepsTheOtherSide) {
+        // The day is mine when this device is in the list of devices.
+        const isMine = completedByList(current).includes(myDeviceId);
+        const next = isMine
+          ? withoutCompletedBy(current, myDeviceId)
+          : withCompletedBy(current, myDeviceId);
+
+        if (!isMine) sound.playComplete();
+
+        updatedEntries = [
+          ...entries.slice(0, existingIndex),
+          next,
           ...entries.slice(existingIndex + 1),
         ];
       } else {
@@ -268,15 +302,17 @@ export const App: React.FC = () => {
       const isComplete = habit?.targetValue ? val >= habit.targetValue : true;
       if (isComplete) sound.playComplete();
 
+      const created: HabitEntry = {
+        habitId,
+        date,
+        completed: isComplete,
+        currentValue: val,
+        completedAt: isComplete ? new Date().toISOString() : undefined,
+      };
+
       updatedEntries = [
         ...entries,
-        {
-          habitId,
-          date,
-          completed: isComplete,
-          currentValue: val,
-          completedAt: isComplete ? new Date().toISOString() : undefined,
-        },
+        isShared ? withCompletedBy(created, myDeviceId) : created,
       ];
     }
 
@@ -327,6 +363,15 @@ export const App: React.FC = () => {
   const handleUpdateSchedule = (habitId: string, days: DayOfWeek[]) => {
     const updatedHabits = habits.map((h) =>
       h.id === habitId ? { ...h, scheduleDays: days } : h
+    );
+    setData((prev) => ({ ...prev, habits: updatedHabits }));
+    saveHabits(updatedHabits);
+  };
+
+  // A shared habit only counts a day when both devices did it.
+  const handleUpdateShared = (habitId: string, shared: boolean) => {
+    const updatedHabits = habits.map((h) =>
+      h.id === habitId ? { ...h, shared } : h
     );
     setData((prev) => ({ ...prev, habits: updatedHabits }));
     saveHabits(updatedHabits);
@@ -393,6 +438,8 @@ export const App: React.FC = () => {
             consistencyStats={stats}
             selectedIndex={selectedHabitIndex}
             onSelectIndex={setSelectedHabitIndex}
+            myDeviceId={myDeviceId}
+            peerDeviceId={peerDeviceId}
           />
         )}
 
@@ -401,6 +448,7 @@ export const App: React.FC = () => {
             habits={habits.filter((h) => !h.archived)}
             onAddHabit={handleAddHabit}
             onUpdateSchedule={handleUpdateSchedule}
+            onUpdateShared={handleUpdateShared}
             onDeleteHabit={handleDeleteHabit}
           />
         )}
@@ -412,6 +460,8 @@ export const App: React.FC = () => {
             stats={stats}
             onToggleEntry={handleToggleEntry}
             onNavigateToMilestones={milestonesEnabled ? () => setCurrentTab('milestones') : undefined}
+            myDeviceId={myDeviceId}
+            peerDeviceId={peerDeviceId}
           />
         )}
 

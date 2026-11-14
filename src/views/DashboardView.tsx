@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Habit, HabitEntry } from '../types';
 import { Cell } from '../components/Cell';
 import { resolveCellState, getTodayString, formatDateToISO, getDayOfWeek } from '../storage';
-import { ChevronLeft, ChevronRight, Calendar, Flame, CheckCircle2, AlertOctagon, Plus, Minus, MessageSquare, Check, X, Shuffle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flame, CheckCircle2, AlertOctagon, Plus, Minus, MessageSquare, Check, X, Shuffle, Users } from 'lucide-react';
 import { sound } from '../audio';
 import { ConsistencyStats } from '../types';
 import { quoteSignalFrom, pickQuote, nextQuote, QuoteSignal } from '../quotes/quotes';
+import { sharedDayState } from '../shared';
 
 interface DashboardViewProps {
   habits: Habit[];
@@ -16,6 +17,8 @@ interface DashboardViewProps {
   consistencyStats: ConsistencyStats;
   selectedIndex: number;
   onSelectIndex: (index: number) => void;
+  myDeviceId?: string | null;
+  peerDeviceId?: string | null;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -27,6 +30,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   consistencyStats,
   selectedIndex,
   onSelectIndex,
+  myDeviceId = null,
+  peerDeviceId = null,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [editingNoteHabitId, setEditingNoteHabitId] = useState<string | null>(null);
@@ -329,11 +334,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ) : (
             dueHabits.map((habit, index) => {
               const entry = entries.find((e) => e.habitId === habit.id && e.date === selectedDate);
-              const cellState = resolveCellState(habit, selectedDate, entries, todayStr);
+              const cellState = resolveCellState(habit, selectedDate, entries, todayStr, myDeviceId, peerDeviceId);
               const isDone = cellState === 'done';
               const isNumeric = Boolean(habit.targetValue && habit.unit);
               const currentVal = entry?.currentValue ?? (isDone && habit.targetValue ? habit.targetValue : 0);
               const isSelected = selectedIndex === index;
+              const shState = habit.shared ? sharedDayState(entry, myDeviceId, peerDeviceId) : null;
 
               return (
                 <div
@@ -358,6 +364,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {habit.title}
                         </span>
+                        {habit.shared && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded border flex items-center gap-1 font-semibold ${
+                              shState === 'both'
+                                ? 'bg-ob-gold/10 border-ob-gold/30 text-ob-gold'
+                                : 'bg-ob-s1 border-ob-line text-ob-dim'
+                            }`}
+                            title="Shared habit: the day counts only when both devices complete it."
+                          >
+                            <Users className="w-2.5 h-2.5" />
+                            {shState === 'both' ? 'Both done' : shState === 'mine' ? 'Waiting for the other device' : shState === 'theirs' ? 'Done on the other device' : 'Shared'}
+                          </span>
+                        )}
                         {/* Note badge */}
                         {entry?.note && (
                           <span
@@ -415,7 +434,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     {/* 7-day mini heatmap trend for this habit */}
                     <div className="hidden sm:flex items-center gap-2">
                       {past7Days.map((dateString) => {
-                        const state = resolveCellState(habit, dateString, entries, todayStr);
+                        const state = resolveCellState(habit, dateString, entries, todayStr, myDeviceId, peerDeviceId);
                         return (
                           <Cell
                             key={dateString}

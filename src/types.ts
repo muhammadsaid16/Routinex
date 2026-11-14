@@ -10,6 +10,9 @@ export interface Habit {
   // Optional target-based habit (numeric)
   targetValue?: number; // e.g. 20
   unit?: string;        // e.g. 'pages', 'mins', 'L'
+  // Shared with the paired device. The day only counts when both devices
+  // did the habit on that day.
+  shared?: boolean;
   // Device sync stamps (last-write-wins merge between paired devices)
   updatedAt?: number;
   updatedBy?: string;
@@ -22,12 +25,15 @@ export interface HabitEntry {
   completedAt?: string;
   currentValue?: number; // for numeric habits (e.g. 15/20)
   note?: string;         // optional micro-journal note ("Why did it slip?" or victory note)
+  // The devices that did the habit on that day. A shared habit needs the
+  // ids of both devices before the day counts.
+  completedBy?: string[];
   // Device sync stamps (last-write-wins merge between paired devices)
   updatedAt?: number;
   updatedBy?: string;
 }
 
-export type CellState = 'done' | 'pending' | 'missed' | 'future' | 'unscheduled';
+export type CellState = 'done' | 'half' | 'pending' | 'missed' | 'future' | 'unscheduled';
 
 export interface ConsistencyStats {
   completed: number;
