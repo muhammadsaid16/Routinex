@@ -332,6 +332,33 @@ export const App: React.FC = () => {
     saveHabits(updatedHabits);
   };
 
+  const handleEditHabit = (
+    habitId: string,
+    updates: {
+      title: string;
+      description?: string;
+      scheduleDays: DayOfWeek[];
+      targetValue?: number;
+      unit?: string;
+    }
+  ) => {
+    const updatedHabits = habits.map((h) =>
+      h.id === habitId
+        ? {
+            ...h,
+            title: updates.title,
+            description: updates.description,
+            scheduleDays: updates.scheduleDays,
+            targetValue: updates.targetValue,
+            unit: updates.unit,
+            updatedAt: Date.now(),
+          }
+        : h
+    );
+    setData((prev) => ({ ...prev, habits: updatedHabits }));
+    saveHabits(updatedHabits);
+  };
+
   const handleDeleteHabit = (habitId: string) => {
     const updatedHabits = habits.map((h) =>
       h.id === habitId ? { ...h, archived: true } : h
@@ -402,6 +429,7 @@ export const App: React.FC = () => {
             onAddHabit={handleAddHabit}
             onUpdateSchedule={handleUpdateSchedule}
             onDeleteHabit={handleDeleteHabit}
+            onEditHabit={handleEditHabit}
           />
         )}
 

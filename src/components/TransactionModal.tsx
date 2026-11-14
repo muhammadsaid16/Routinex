@@ -47,6 +47,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [note, setNote] = useState<string>('');
   const [habitId, setHabitId] = useState<string>('');
   const [loadedId, setLoadedId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts]);
 
@@ -54,6 +55,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const editingId = transaction?.id || null;
   if (isOpen && editingId !== loadedId) {
     setLoadedId(editingId);
+    setConfirmDelete(false);
     setAmount(transaction ? centsToInput(Math.abs(transaction.amount)) : '');
     setIsExpense(transaction ? transaction.amount < 0 : true);
     setCategory(transaction?.category || 'food');
@@ -255,15 +257,35 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1">
           {transaction && onDelete && (
-            <button
-              onClick={() => {
-                onDelete(transaction.id);
-                onClose();
-              }}
-              className="px-3 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-semibold hover:bg-red-500/25 transition-colors"
-            >
-              Delete
-            </button>
+            confirmDelete ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete(transaction.id);
+                    onClose();
+                  }}
+                  className="px-3 py-2.5 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  Delete?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-2 py-2.5 rounded-xl border border-ob-line bg-ob-s1 text-xs text-ob-dim hover:text-ob-text"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="px-3 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-semibold hover:bg-red-500/25 transition-colors"
+              >
+                Delete
+              </button>
+            )
           )}
           <button
             onClick={onClose}

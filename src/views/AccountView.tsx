@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2, Trophy, KeyRound, Eye, EyeOff, Loader2, Bot } from 'lucide-react';
+import { Globe, Shield, RefreshCw, Sparkles, Palette, Volume2, Download, Upload, Keyboard, Check, Maximize2, Edit3, X, Trash2, Monitor, Smartphone, CheckCircle2, Trophy, KeyRound, Eye, EyeOff, Loader2, Bot, AlertTriangle } from 'lucide-react';
 import { sound } from '../audio';
 import { exportBackupJSON, importBackupJSON, getInitials } from '../storage';
 import { Habit, HabitEntry } from '../types';
@@ -41,6 +41,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
   const [soundOn, setSoundOn] = useState<boolean>(sound.isEnabled());
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [showResetOptions, setShowResetOptions] = useState<boolean>(false);
+  const [showWipeModal, setShowWipeModal] = useState<boolean>(false);
   const [resetFeedback, setResetFeedback] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
   const [editedName, setEditedName] = useState<string>(userName);
@@ -613,10 +614,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
                 <button
                   onClick={() => {
                     sound.playClick();
-                    onClearAll();
-                    setResetFeedback('All habits and history have been cleared. Clean slate!');
-                    setShowResetOptions(false);
-                    setTimeout(() => setResetFeedback(null), 3500);
+                    setShowWipeModal(true);
                   }}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white shadow-sm hover:shadow text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border border-red-700/40"
                 >
@@ -631,6 +629,51 @@ export const AccountView: React.FC<AccountViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Wipe Confirmation Modal */}
+      {showWipeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-ob-line bg-ob-raised p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-ob-text">Wipe All Data?</h2>
+                <p className="text-xs text-ob-dim mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-ob-line bg-ob-s1 p-3 text-xs text-ob-dim leading-relaxed">
+              All habits, past completions, journal notes, and ledger records will be permanently wiped. Your appearance and sound settings will remain.
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowWipeModal(false)}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-ob-dim hover:text-ob-text hover:bg-ob-s1 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playClick();
+                  onClearAll();
+                  setShowWipeModal(false);
+                  setShowResetOptions(false);
+                  setResetFeedback('All habits and history have been cleared. Clean slate!');
+                  setTimeout(() => setResetFeedback(null), 3500);
+                }}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors shadow-sm cursor-pointer"
+              >
+                Yes, Wipe Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
